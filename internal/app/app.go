@@ -102,6 +102,9 @@ func (a *App) Run(ctx context.Context) {
 	go func() { a.Server.RunUpdateChecks(ctx); close(done) }()
 	go backup.NewLocks(a.Store).RunSweeper(ctx, time.Minute)
 	go a.Server.RunCatalog(ctx) // catalog ingestion worker (P1-16)
+	// Extracted copies of compressed stored files live 10 minutes past
+	// their last use.
+	go a.Blobs.RunExtractSweeper(ctx, time.Minute, storage.ExtractIdle)
 	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	n := 0
@@ -122,6 +125,7 @@ func (a *App) maintain(ctx context.Context, orphans bool) {
 	a.Server.RunMaintenance(ctx, orphans)
 	a.Server.ExpireApprovals(ctx)
 	a.Server.ExpireTaskLeases(ctx)
+	go a.Server.MaybeCompressStorage(ctx) // incremental; skips if a pass is running
 	if _, err := a.Store.ExpirePlans(ctx, planRetention); err != nil && ctx.Err() == nil {
 		slog.Warn("plan expiry failed", "err", err)
 	}

@@ -396,7 +396,11 @@ func (m *Manager) Place(ctx context.Context, userID int64, sha, tempPath string,
 		return err
 	}
 	created := false
-	if _, err := os.Lstat(dest); errors.Is(err, os.ErrNotExist) {
+	_, err = os.Lstat(dest)
+	if errors.Is(err, os.ErrNotExist) && regular(dest+zstSuffix) {
+		err = nil // already stored compressed
+	}
+	if errors.Is(err, os.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
 			return err
 		}
@@ -467,7 +471,7 @@ func (m *Manager) LinkExisting(ctx context.Context, userID int64, sha string, co
 	if err != nil {
 		return false, err
 	}
-	if fi, err := os.Lstat(p); err != nil || !fi.Mode().IsRegular() {
+	if _, _, err := storedPath(p); err != nil {
 		slog.Warn("blob row exists but file is missing; forcing re-upload", "user", userID, "sha", sha)
 		return false, nil
 	}
@@ -490,6 +494,7 @@ func (m *Manager) Remove(ctx context.Context, refs []store.BlobRef) {
 			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 				slog.Warn("failed to delete blob", "path", p, "err", err)
 			}
+			m.removeVariants(r.LocationID, r.UserID, r.SHA256, p)
 		}()
 	}
 }
@@ -501,14 +506,15 @@ func (m *Manager) Open(locID, userID int64, sha string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi, err := os.Lstat(p)
+	sp, zipped, err := storedPath(p)
 	if err != nil {
 		return nil, err
 	}
-	if !fi.Mode().IsRegular() {
-		return nil, fmt.Errorf("%w: %s", ErrUnsafePath, p)
+	if zipped {
+		// At-rest compressed (compress.go): read from the extracted copy.
+		return m.openExtracted(locID, userID, sha, sp)
 	}
-	return os.Open(p)
+	return os.Open(sp)
 }
 
 // HashFile computes the SHA-256 of a file.
@@ -631,6 +637,11 @@ func (m *Manager) CleanOrphans(ctx context.Context, minAge time.Duration) (int, 
 				return nil
 			}
 			sha, partial := strings.CutSuffix(d.Name(), copySuffix)
+			if !partial {
+				// A compression run interrupted mid-write.
+				sha, partial = strings.CutSuffix(sha, zstSuffix+".tmp")
+			}
+			sha = blobBaseName(sha)
 			if !ValidSHA256(sha) {
 				return nil
 			}

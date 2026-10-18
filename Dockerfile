@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # VaultDock server image: web UI + API in one static binary.
 
 # Build stages run on the build machine's native platform and cross-compile,

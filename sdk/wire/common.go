@@ -66,6 +66,9 @@ const (
 	FeatureAI           = "ai.v1"
 	FeatureDeployEnv    = "deploy_env.v1"
 	FeatureRestore      = "restore.v1" // rev 1.1c
+	// FeatureUploadZstd: upload chunks may be sent with
+	// "Content-Encoding: zstd"; X-Chunk-SHA256 stays the hash of the raw chunk.
+	FeatureUploadZstd = "upload.zstd"
 )
 
 // List limits for ?cursor=&limit= (api-v1 §1).

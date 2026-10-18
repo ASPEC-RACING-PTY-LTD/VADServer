@@ -9,12 +9,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/storage"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 )
 
@@ -562,12 +562,15 @@ func (s *Server) zipBlobLocation(r *http.Request, userID int64, sha string) (int
 	if err != nil {
 		return 0, "no blob record in the database"
 	}
-	p, err := s.blobs.BlobPath(loc, userID, sha)
+	ok, err := s.blobs.BlobStored(loc, userID, sha)
 	if err != nil {
-		return 0, "storage location unavailable"
-	}
-	if _, err := os.Stat(p); err != nil {
+		if errors.Is(err, storage.ErrLocationUnavailable) {
+			return 0, "storage location unavailable"
+		}
 		return 0, zipMissingReason(err)
+	}
+	if !ok {
+		return 0, zipMissingReason(fs.ErrNotExist)
 	}
 	return loc, ""
 }

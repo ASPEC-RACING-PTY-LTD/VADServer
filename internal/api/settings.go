@@ -26,6 +26,9 @@ type Settings struct {
 	DeviceRequestTTLMinutes int    `json:"device_request_ttl_minutes"`
 	KeepReplacedVersions    bool   `json:"keep_replaced_versions"`
 	MinFreeBytes            int64  `json:"min_free_bytes"`
+	// StorageCompression compresses stored files in the background
+	// (zstd, only where it saves space); reads extract them transparently.
+	StorageCompression bool `json:"storage_compression"`
 }
 
 func defaultSettings() Settings {

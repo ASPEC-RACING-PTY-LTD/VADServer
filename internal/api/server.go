@@ -649,6 +649,7 @@ var knownFeatures = []string{
 	wire.FeatureBackup, wire.FeatureEscrow, wire.FeatureDeviceTasks, wire.FeatureApprovals,
 	wire.FeatureVersions, wire.FeatureSyncTwoWay, wire.FeatureProfiles, wire.FeatureModules,
 	wire.FeatureDestinations, wire.FeatureAI, wire.FeatureDeployEnv, wire.FeatureRestore,
+	wire.FeatureUploadZstd,
 }
 
 var (
@@ -871,6 +872,8 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 					r.Post("/admin/storage", s.handleAdminCreateStorage)
 					r.Patch("/admin/storage/{id}", s.handleAdminPatchStorage)
 					r.Delete("/admin/storage/{id}", s.handleAdminDeleteStorage)
+					r.Get("/admin/storage/compression", s.handleStorageCompression)
+					r.Post("/admin/storage/compression/run", s.handleStorageCompressionRun)
 					r.Get("/admin/devices", s.handleAdminDevices)
 					r.Post("/admin/devices/{id}/revoke", s.handleAdminDeviceRevoke)
 					r.Get("/admin/transfers", s.handleAdminTransfers)

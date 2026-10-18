@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,7 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"time"
+
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
 )
 
 type UploadRequest struct {
@@ -199,4 +203,37 @@ func retry(ctx context.Context, attempts int, fn func() error) error {
 		delay = min(delay*2, 30*time.Second)
 	}
 	return err
+}
+
+// PutChunkCompressed uploads chunk idx zstd-compressed ("Content-Encoding:
+// zstd", feature upload.zstd); X-Chunk-SHA256 is still the raw chunk's sum
+// and the request signature covers the compressed body. sent reports
+// whether it was sent compressed: when compression does not pay off it
+// returns sent=false without a request, and the caller sends it raw.
+func (c *Client) PutChunkCompressed(ctx context.Context, id string, idx int64, r io.ReaderAt, off, length int64, sum string) (sent bool, err error) {
+	raw := make([]byte, length)
+	if _, err := r.ReadAt(raw, off); err != nil && !(errors.Is(err, io.EOF) && int64(len(raw)) == length) {
+		return false, fmt.Errorf("read chunk: %w", err)
+	}
+	body := compress.Frame(raw)
+	if !compress.Worth(len(body), len(raw)) {
+		return false, nil
+	}
+	bsum := sha256.Sum256(body)
+	wrap := func(rd io.Reader) io.Reader {
+		if c.ChunkBody != nil {
+			return c.ChunkBody(rd)
+		}
+		return rd
+	}
+	req, err := c.newRequest(ctx, "PUT", fmt.Sprintf("/api/v1/uploads/%s/chunks/%d", id, idx), wrap(bytes.NewReader(body)), hex.EncodeToString(bsum[:]), int64(len(body)), true)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Encoding", "zstd")
+	req.Header.Set("X-Chunk-SHA256", sum)
+	req.Header.Set("X-Chunk-Raw-Length", strconv.FormatInt(length, 10))
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(wrap(bytes.NewReader(body))), nil }
+	return true, c.send(req, nil)
 }

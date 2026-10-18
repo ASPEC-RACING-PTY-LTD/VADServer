@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,8 +18,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/mimetypes"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/auth"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/storage"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
@@ -296,16 +299,35 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	want := up.ChunkLen(idx)
-	if r.ContentLength != want {
+	zipped := strings.EqualFold(strings.TrimSpace(r.Header.Get("Content-Encoding")), "zstd")
+	switch enc := r.Header.Get("Content-Encoding"); {
+	case zipped:
+		// upload.zstd: the body is a zstd frame of the chunk. Bound the
+		// compressed size; the decoded size must still be exactly want.
+		if r.ContentLength <= 0 || r.ContentLength > want+want/8+(64<<10) {
+			writeErr(w, r, errf(400, "bad_length", "Compressed chunk %d has an invalid length (%d)", idx, r.ContentLength))
+			return
+		}
+	case enc != "" && !strings.EqualFold(enc, "identity"):
+		writeErr(w, r, errf(415, "unsupported_encoding", "Chunk encoding %q is not supported", enc))
+		return
+	case r.ContentLength != want:
 		writeErr(w, r, errf(400, "bad_length", "Chunk %d must be exactly %d bytes (got %d)", idx, want, r.ContentLength))
 		return
 	}
 	declared := strings.ToLower(r.Header.Get("X-Chunk-SHA256"))
+	bodySHA := "" // hash of the bytes on the wire, checked for compressed chunks
 	if p.Device != nil {
-		// The signed body hash is authoritative for devices.
-		declared = p.DeclaredBodySHA
+		// The signed body hash is authoritative for devices. For a
+		// compressed chunk it covers the compressed bytes; the raw chunk is
+		// then checked against X-Chunk-SHA256.
+		if zipped {
+			bodySHA = p.DeclaredBodySHA
+		} else {
+			declared = p.DeclaredBodySHA
+		}
 	}
-	if declared != "" && !storage.ValidSHA256(declared) {
+	if (declared != "" && !storage.ValidSHA256(declared)) || (zipped && !storage.ValidSHA256(declared)) {
 		writeErr(w, r, errf(400, "invalid_hash", "Invalid chunk hash"))
 		return
 	}
@@ -363,15 +385,34 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	ow := io.NewOffsetWriter(f, idx*up.ChunkSize)
+	var body io.Reader = r.Body
+	var wire hashReader
+	if zipped {
+		wire = hashReader{r: io.LimitReader(r.Body, r.ContentLength), h: sha256.New()}
+		zr, err := compress.NewFrameReader(&wire)
+		if err != nil {
+			writeErr(w, r, errf(400, "bad_encoding", "Invalid compressed chunk"))
+			return
+		}
+		defer zr.Close()
+		body = zr
+	}
 	var got string
 	if already {
 		// A retry of a stored chunk is staged and verified first, so a
 		// corrupted retry can never overwrite good data.
-		got, err = receiveChunkStaged(tmp, idx, ow, r.Body, want, declared)
+		got, err = receiveChunkStaged(tmp, idx, ow, body, want, declared)
 	} else {
 		// The region is not yet marked received, so writing in place is safe
 		// even if verification then fails.
-		got, err = receiveChunk(ow, r.Body, idx, want, declared)
+		got, err = receiveChunk(ow, body, idx, want, declared)
+	}
+	if err == nil && zipped && bodySHA != "" {
+		// The rest of the frame (end marks) is part of the signed bytes.
+		_, _ = io.Copy(io.Discard, &wire)
+		if hex.EncodeToString(wire.h.Sum(nil)) != bodySHA {
+			err = errf(422, "chunk_hash_mismatch", "Chunk %d was corrupted in transit; retry", idx)
+		}
 	}
 	if err != nil {
 		writeErr(w, r, err)
@@ -667,3 +708,17 @@ func humanBytes(n int64) string {
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
+
+// hashReader hashes the bytes read through it (the compressed wire body).
+type hashReader struct {
+	r io.Reader
+	h hash.Hash
+}
+
+func (h *hashReader) Read(p []byte) (int, error) {
+	n, err := h.r.Read(p)
+	h.h.Write(p[:n])
+	return n, err
+}
+
+func init() { implementFeature(wire.FeatureUploadZstd) }
