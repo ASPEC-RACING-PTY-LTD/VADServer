@@ -388,3 +388,12 @@ func (m *Manager) RotateSEK(ctx context.Context, a Audit) (uint32, error) {
 	slog.Info("rotated server escrow key", "sek_version", next)
 	return next, nil
 }
+
+// KEK returns a copy of the server KEK for the one-time superuser export
+// (GET /admin/keys/kek). Nil manager: ErrUnavailable.
+func (m *Manager) KEK() (vdcrypt.Key, error) {
+	if m == nil {
+		return vdcrypt.Key{}, ErrUnavailable
+	}
+	return m.kek, nil
+}

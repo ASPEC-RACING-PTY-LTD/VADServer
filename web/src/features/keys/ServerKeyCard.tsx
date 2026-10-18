@@ -1,6 +1,8 @@
-import { KeyRound } from 'lucide-react'
-import { Badge, Spinner } from '../../components/ui'
-import { useServerKeyStatus } from './api'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Download, KeyRound } from 'lucide-react'
+import { Badge, Button, Spinner } from '../../components/ui'
+import { downloadKEK, keyKeys, useKEKExportStatus, useServerKeyStatus } from './api'
 
 /** Server key status (api-v1 §5A): SIK fingerprint and current SEK version, or unavailable. */
 export function ServerKeyCard() {
@@ -40,6 +42,47 @@ export function ServerKeyCard() {
           </div>
         </div>
       )}
+      <KEKExport />
     </section>
+  )
+}
+
+/** One-time download of the server key file (superusers only). */
+function KEKExport() {
+  const q = useKEKExportStatus()
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  if (!q.data || !q.data.available) return null
+  if (q.data.exported) {
+    return (
+      <p className="mt-4 text-xs text-slate-500">
+        The server key file was downloaded{q.data.exported_at ? ` on ${new Date(q.data.exported_at).toLocaleString()}` : ''}. It cannot be downloaded again from the portal.
+      </p>
+    )
+  }
+  const go = async () => {
+    if (!window.confirm('Download the server key file now? This works only once. Keep the file somewhere safe and private.')) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await downloadKEK()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      void qc.invalidateQueries({ queryKey: keyKeys.sub('kek') })
+    }
+  }
+  return (
+    <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/40">
+      <p className="mb-2">
+        Download the server key file and keep it somewhere safe (a password manager or an encrypted drive). You need it to rebuild this server. It can be downloaded <strong>only once</strong>.
+      </p>
+      <Button size="sm" variant="primary" icon={<Download className="size-4" />} loading={busy} onClick={() => void go()}>
+        Download server key
+      </Button>
+      {err && <p className="mt-2 text-rose-600">{err}</p>}
+    </div>
   )
 }

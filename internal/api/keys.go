@@ -20,6 +20,7 @@ func (s *Server) mountKeys(rt routes) {
 	rt.User.Get("/keys/server", s.handleServerKeys)
 	s.mountRepoKeys(rt)                                                  // P1-13: /repos/{id}/keys/*, PATCH /repos/{id} (repo_keys.go)
 	rt.Super.Post("/admin/keys/rotate-server", s.handleRotateServerKeys) // §11B; 202 operation
+	s.mountKEKExport(rt)
 }
 
 // keyManagers holds the key custody of each Server (server.go is not owned

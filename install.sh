@@ -577,9 +577,10 @@ ${B}Back up the server key now${N}
   $f
   This file (the server key-encryption key) protects the server's private keys,
   catalog keys and stored credentials. It is not inside the database backups.
-  * Copy it to a safe place OUTSIDE this server: a password manager attachment,
-    an encrypted USB drive or offline storage. For example, from your computer:
-      scp <user>@<this server>:$f ./vaultdock-server.kek
+  * Download it once from the web portal: sign in as a superuser, open
+    Devices > Server keys and choose "Download server key". Keep it in a safe
+    place OUTSIDE this server (password manager, encrypted USB drive). The
+    portal allows this download only once.
   * Keep it secret: with this file and a copy of the database, anyone can open
     the server-side escrow.
   * After rebuilding the server, put it back at the same path before starting
@@ -589,7 +590,7 @@ ${B}Back up the server key now${N}
   The key is never printed and install.sh never copies it off this server.
 EOF
 	if [ "$YES" != 1 ] && have_tty; then
-		if confirm "Have you copied the key file to a safe place outside this server?" n; then
+		if confirm "Have you downloaded the server key from the portal (or will you right after setup)?" n; then
 			date -u +%Y-%m-%dT%H:%M:%SZ >"$DIR/$KEK_MARK_REL"
 			ok "Thank you. Keep that copy safe."
 		else
