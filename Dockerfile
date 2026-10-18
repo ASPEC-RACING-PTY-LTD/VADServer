@@ -4,12 +4,8 @@
 # Build stages run on the build machine's native platform and cross-compile,
 # so multi-architecture images build without emulation.
 
-# The shared SDK comes from the Go module proxy by default. Before an SDK
-# version is published (go.mod still has `replace => ../VaultDock/sdk`), build
-# against a local checkout of the VaultDock repository:
-#   docker buildx build --build-context sdk=../VaultDock/sdk .
-# This empty stage is what `sdk` resolves to when no build context is given.
-FROM scratch AS sdk
+# The shared SDK is vendored in ./sdk (go.mod: replace => ./sdk), so this
+# repository alone builds the image.
 
 FROM --platform=$BUILDPLATFORM node:24-alpine AS web
 WORKDIR /src/web
@@ -22,14 +18,7 @@ FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src
 ENV CGO_ENABLED=0 GOFLAGS=-trimpath
 COPY go.mod go.sum ./
-COPY --from=sdk / /sdk/
-# With an sdk build context, point the replace at it; otherwise drop the
-# relative replace (its target is outside the build context) and use the proxy.
-RUN if [ -f /sdk/go.mod ]; then \
-      go mod edit -replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk=/sdk; \
-    else \
-      go mod edit -dropreplace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk; \
-    fi
+COPY sdk ./sdk
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal

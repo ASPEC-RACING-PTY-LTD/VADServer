@@ -1,0 +1,43 @@
+{
+  "ad": "vd1:snapshot:00000000-0000-4000-8000-000000000000",
+  "device_sign_pub": "dde3bccec7f3a66a1115f45d720f4dc135c3ae7c4e22dca38fdb1efd6a495ff8",
+  "epoch": 2,
+  "file_hashes": [
+    {
+      "content": "hello",
+      "h": "b5dd80014a8ac646403324970d4b5539b7f236f6bee1e815517f569fefda510c"
+    },
+    {
+      "content": "",
+      "h": "cfc8f2e9762cf2376f311ee2d31ed20cee7a42064f425519f5b7bbbdbadb2e31"
+    }
+  ],
+  "inputs": {
+    "device_sign_seed": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+    "dk": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "rmk_2": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "rng_label": "snapshot_root"
+  },
+  "k_fh": "9138bd079d30d48a901cf841733c09e4ce05d30ed1ddcedfd19677a01bc1547a",
+  "k_id": "24227244f372124c8eca8f5b6766a1b2cdc577018c647a6de85a192d287c1416",
+  "k_meta": "d8a1b029f226e2732570e85a96315e69fbaa9fc891cee3771e9db41315ad09f6",
+  "note": "zstd payload bytes depend on klauspost/compress level 3; readers must only require that sealed opens to root_json",
+  "oid": "bb4bd4c2a3f3053a0da036d30437ded06eee5989f8a474ffc5b998f3a51fc4da",
+  "part": "snapshot",
+  "repo_uuid": "00000000-0000-4000-8000-000000000000",
+  "root_json": "{\"device\":{\"id\":3,\"key_id\":\"00112233445566778899aabbccddeeff\",\"name\":\"DESKTOP-ABC\"},\"epoch\":2,\"host\":{\"hostname\":\"DESKTOP-ABC\",\"machine_guid_hash\":\"abababababababababababababababababababababababababababababababab\",\"os\":\"Windows 11 Pro 10.0.26300\",\"sid\":\"S-1-5-21-1000\",\"user\":\"ali\"},\"install_mode\":\"simple\",\"inventory\":null,\"issues_summary\":{\"by_class\":{\"locked\":1},\"skipped\":1},\"job\":{\"id\":12,\"kind\":\"folder\",\"mode\":\"full\",\"name\":\"Documents\"},\"parent\":null,\"profile\":{\"consent_id\":\"consent-1\",\"sid\":\"S-1-5-21-1000\",\"username\":\"ali\"},\"repo\":\"00000000-0000-4000-8000-000000000000\",\"roots\":[{\"token_path\":\"{DOCUMENTS}\",\"tree\":\"eb32d5286fa85ff3006c4c6638cdc3f52e85f99b62eccd983d85c133ae4eabff\"}],\"sig\":\"agTJMqEH4WgpqCboJtc36BUEALejAB1x+oSrIJUTxMUWUpwQ+rB1dNOgdi1y3VeWqid6AeMn/C3hZiR4ek1FAA==\",\"stats\":{\"bytes\":5,\"dirs\":2,\"files\":1},\"tags\":[\"daily\"],\"time\":1760745600000,\"tokens\":{\"{DOCUMENTS}\":\"D:\\\\OneDrive\\\\Documents\",\"{PROFILE}\":\"C:\\\\Users\\\\ali\"},\"v\":1}",
+  "sealed": "0102000000d3e8293a80cfee759aed640d73bcfe00de7ca5c3d381934519b40dd7f65abb8ed5f292f739930ebbd9f43858f2b30bd166ccbd44c55ade7a9634a9f31412e39ce0f5e0e5acb19fb8d7ea920399c895e9ddf128cc0c63eb7a2bcf3c6580286ec86f55daa68887ae3e44dd4614c0dd154e4a30ed6be64cce1d2a176029ee6ebf862251b3f6cba87ec6bf744ebda0b6f73afb9980557e8a166c78938b3b30a46db40369810d9c32fadf1f4d5b5306185d6eb179bbbd372d55664e54bbc48cb7765eb5b8de3d1ebd9836dfcd216a426790419504057a8d6a786e989cb1cd9d087229d310fd44fd73bf7792ed2968467c2b95d8764cd9a78d81a816adc9d1b051700c3afdc924a91cab5e13200a145c71a24c1070140fdcc358fd0dc8ddf1e8c2a69f419f79a54fba675e27a99e182377b6babbd5ec2611cf447168a0f1676a91ae9c771bbbabfe873f96547f0bc6efa54ec17f13511fd08388b775c3988c3b4a7d181937d4f00012617f377706088248825b4a01ef0d33ea12fd81e926b042de391bdb2d9a6a7f052595aa16fe6903f31d678f02db0d91b68878fcc8040ba720e710688b1b7c1aac9cecb740aac0c89521daf883d8a472d064b956925778668450e129a7a7e2b4cad95e4c88ee012416792c12253cedab01c03bb4c77b79c7a99a0b6c47b9aba6d677859d5aaa164662315f031c95c489e69066d8b5aed2c14deb6a5c3392f69dba023c0818df40d2e2ecd1b8191d104cf98e12df73d39b20a7b6e9c4269629020a53ecc1a052efeff57041cf3f04168e6fdd035e059a9a39878340951daa3b3c1ae548eacf1e2f7b28c1f96e6167b7c040f82c5ec4259809abeabed2a4adcf6ff2246c0c245e3f9dff44d588f0e1dd604b02ba04e644534092074f88d0",
+  "sig": "agTJMqEH4WgpqCboJtc36BUEALejAB1x+oSrIJUTxMUWUpwQ+rB1dNOgdi1y3VeWqid6AeMn/C3hZiR4ek1FAA==",
+  "signing_bytes": "{\"device\":{\"id\":3,\"key_id\":\"00112233445566778899aabbccddeeff\",\"name\":\"DESKTOP-ABC\"},\"epoch\":2,\"host\":{\"hostname\":\"DESKTOP-ABC\",\"machine_guid_hash\":\"abababababababababababababababababababababababababababababababab\",\"os\":\"Windows 11 Pro 10.0.26300\",\"sid\":\"S-1-5-21-1000\",\"user\":\"ali\"},\"install_mode\":\"simple\",\"inventory\":null,\"issues_summary\":{\"by_class\":{\"locked\":1},\"skipped\":1},\"job\":{\"id\":12,\"kind\":\"folder\",\"mode\":\"full\",\"name\":\"Documents\"},\"parent\":null,\"profile\":{\"consent_id\":\"consent-1\",\"sid\":\"S-1-5-21-1000\",\"username\":\"ali\"},\"repo\":\"00000000-0000-4000-8000-000000000000\",\"roots\":[{\"token_path\":\"{DOCUMENTS}\",\"tree\":\"eb32d5286fa85ff3006c4c6638cdc3f52e85f99b62eccd983d85c133ae4eabff\"}],\"stats\":{\"bytes\":5,\"dirs\":2,\"files\":1},\"tags\":[\"daily\"],\"time\":1760745600000,\"tokens\":{\"{DOCUMENTS}\":\"D:\\\\OneDrive\\\\Documents\",\"{PROFILE}\":\"C:\\\\Users\\\\ali\"},\"v\":1}",
+  "trees": [
+    {
+      "id": "eb32d5286fa85ff3006c4c6638cdc3f52e85f99b62eccd983d85c133ae4eabff",
+      "raw": "{\"v\":1,\"entries\":[{\"n\":\"report.docx\",\"nb\":null,\"t\":\"f\",\"s\":5,\"m\":1760745600123456789,\"c\":1760745600000000000,\"a\":32,\"h\":\"b5dd80014a8ac646403324970d4b5539b7f236f6bee1e815517f569fefda510c\",\"ch\":[\"c9c823e19a2abe5164c93ff6a7601a32de2ce602e1808850f6c643d201237508\"],\"sub\":null,\"ln\":null,\"x\":{\"ads\":[{\"name\":\"Zone.Identifier\",\"ch\":[\"c9c823e19a2abe5164c93ff6a7601a32de2ce602e1808850f6c643d201237508\"],\"s\":5}]}},{\"n\":\"Ünïcödé 😀\",\"nb\":null,\"t\":\"d\",\"s\":0,\"m\":1760745600000000000,\"c\":1760745600000000000,\"a\":16,\"h\":null,\"ch\":null,\"sub\":\"b7fad76b8033cd22988491e60770ff1574c878fa285055b67ae8b5e6dc6a4afe\",\"ln\":null}],\"cont\":null}"
+    },
+    {
+      "id": "b7fad76b8033cd22988491e60770ff1574c878fa285055b67ae8b5e6dc6a4afe",
+      "raw": "{\"v\":1,\"entries\":[{\"n\":\"empty.txt\",\"nb\":null,\"t\":\"f\",\"s\":0,\"m\":1760745600000000000,\"c\":1760745600000000000,\"a\":32,\"h\":\"cfc8f2e9762cf2376f311ee2d31ed20cee7a42064f425519f5b7bbbdbadb2e31\",\"ch\":[],\"sub\":null,\"ln\":null}],\"cont\":null}"
+    }
+  ],
+  "vector": 5
+}

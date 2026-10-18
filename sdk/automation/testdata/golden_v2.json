@@ -1,0 +1,1076 @@
+{
+  "action": [
+    {
+      "type": "action",
+      "kind": "dest.create_folder",
+      "title": "Create destination folder",
+      "description": "Ensure a folder exists in your storage (created if missing).",
+      "category": "Destination",
+      "params": [
+        {
+          "name": "folder",
+          "type": "template",
+          "required": true,
+          "description": "Folder path template; relative paths are inside the sync destination.",
+          "example": "/Archive/{{now|date:\"YYYY\"}}"
+        }
+      ],
+      "contexts": [
+        "file",
+        "sync",
+        "schedule"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "dest.rename",
+      "title": "Rename destination file",
+      "description": "Store the file under a different name. The local file is never renamed.",
+      "category": "Destination",
+      "params": [
+        {
+          "name": "name",
+          "type": "template",
+          "required": true,
+          "description": "File name template.",
+          "example": "{{file.created|date:\"YYYY-MM-DD_HH-mm\"}}_{{file.stem}}.{{file.ext}}"
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "dest.set_folder",
+      "title": "Move to destination folder",
+      "description": "Upload into this folder instead of mirroring the local folder. Relative paths are inside the sync configuration's destination; paths starting with / are from the root of your storage. Supports {{variables}}.",
+      "category": "Destination",
+      "params": [
+        {
+          "name": "folder",
+          "type": "template",
+          "required": true,
+          "description": "Destination folder template.",
+          "example": "{{file.parent_name|default:\"Unsorted\"}}/{{file.created|date:\"YYYY-MM\"}}"
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "notify.send",
+      "title": "Send notification",
+      "description": "Show a notification in the web interface and/or the desktop app.",
+      "category": "Notify",
+      "params": [
+        {
+          "name": "title",
+          "type": "template",
+          "required": true,
+          "description": "Notification title.",
+          "example": "New clip: {{file.name}}"
+        },
+        {
+          "name": "message",
+          "type": "template",
+          "required": false,
+          "description": "Body text.",
+          "example": "Uploaded {{file.size_mb}} MB"
+        },
+        {
+          "name": "level",
+          "type": "enum",
+          "required": false,
+          "default": "info",
+          "options": [
+            "info",
+            "success",
+            "warning",
+            "error"
+          ],
+          "description": "Severity."
+        },
+        {
+          "name": "channel",
+          "type": "enum",
+          "required": false,
+          "default": "both",
+          "options": [
+            "both",
+            "web",
+            "desktop"
+          ],
+          "description": "Where to show it."
+        }
+      ],
+      "contexts": [
+        "file",
+        "sync",
+        "schedule"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device",
+        "server"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "sync.file",
+      "title": "Synchronise file",
+      "description": "Upload the file. Files that pass the sync configuration filters are uploaded by default; use this to make intent explicit.",
+      "category": "Sync",
+      "params": [],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "sync.skip",
+      "title": "Skip file",
+      "description": "Do not upload the file. Skip always wins over Synchronise for the same automation.",
+      "category": "Sync",
+      "params": [
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false,
+          "description": "Shown in transfer history.",
+          "example": "Temporary file"
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "sync.start_task",
+      "title": "Start another sync task",
+      "description": "Queue a scan of another sync configuration on the same device. Guarded against loops.",
+      "category": "Sync",
+      "params": [
+        {
+          "name": "config",
+          "type": "string",
+          "required": true,
+          "description": "Name of the sync configuration to run.",
+          "example": "Screenshots"
+        }
+      ],
+      "contexts": [
+        "file",
+        "sync",
+        "schedule"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "action",
+      "kind": "tag.apply",
+      "title": "Apply tag",
+      "description": "Attach storage tags/categories to the uploaded file.",
+      "category": "Organise",
+      "params": [
+        {
+          "name": "tags",
+          "type": "string_list",
+          "required": true,
+          "description": "Tags (templates allowed).",
+          "example": [
+            "clips",
+            "{{file.parent_name|lower}}"
+          ],
+          "templated": true
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    }
+  ],
+  "condition": [
+    {
+      "type": "condition",
+      "kind": "date.compare",
+      "title": "Date created or modified",
+      "description": "Compares the file's created or modified time with a fixed date.",
+      "category": "Time",
+      "params": [
+        {
+          "name": "field",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "created",
+            "modified"
+          ],
+          "description": "Which timestamp to compare.",
+          "example": "created"
+        },
+        {
+          "name": "operator",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "before",
+            "after"
+          ],
+          "description": "before or after.",
+          "example": "after"
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": true,
+          "description": "YYYY-MM-DD (local midnight) or an RFC 3339 timestamp.",
+          "example": "2026-01-01"
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "extension.in",
+      "title": "File extension matches",
+      "description": "The file extension is one of the listed values.",
+      "category": "Name",
+      "params": [
+        {
+          "name": "extensions",
+          "type": "string_list",
+          "required": true,
+          "description": "Extensions without the dot, case-insensitive.",
+          "example": [
+            "mp4",
+            "mov"
+          ]
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "file.age",
+      "title": "File age",
+      "description": "Compares the number of days since the file was last modified.",
+      "category": "Time",
+      "params": [
+        {
+          "name": "operator",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq"
+          ],
+          "description": "gt, gte, lt, lte or eq.",
+          "example": "lt"
+        },
+        {
+          "name": "days",
+          "type": "integer",
+          "required": true,
+          "min": 0,
+          "max": 36500,
+          "description": "Age in whole days.",
+          "example": 30
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "group",
+      "title": "AND / OR group",
+      "description": "Combines several rules. mode \"all\" is AND, \"any\" is OR. Rules can nest groups.",
+      "category": "Logic",
+      "params": [
+        {
+          "name": "mode",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "all",
+            "any"
+          ],
+          "description": "all = every rule must pass (AND); any = at least one (OR).",
+          "example": "any"
+        },
+        {
+          "name": "rules",
+          "type": "rules",
+          "required": true,
+          "description": "List of {\"kind\": \u003ccondition kind\u003e, \"params\": {...}} objects.",
+          "example": [
+            {
+              "kind": "extension.in",
+              "params": {
+                "extensions": [
+                  "mp4"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file",
+        "sync",
+        "schedule"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device",
+        "server"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "name.contains",
+      "title": "Filename contains",
+      "description": "The file name contains the given text.",
+      "category": "Name",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "Text to look for.",
+          "example": "highlight"
+        },
+        {
+          "name": "case_sensitive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Match case exactly."
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "name.matches",
+      "title": "Filename matches pattern",
+      "description": "The file name matches a glob pattern such as \"*.tmp\" or \"Replay_*\".",
+      "category": "Name",
+      "params": [
+        {
+          "name": "pattern",
+          "type": "glob",
+          "required": true,
+          "description": "Glob pattern.",
+          "example": "*.part"
+        },
+        {
+          "name": "case_sensitive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Match case exactly."
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "path.matches",
+      "title": "Folder path matches",
+      "description": "The file's path relative to the sync root matches a glob. Use ** to match any number of folders.",
+      "category": "Path",
+      "params": [
+        {
+          "name": "pattern",
+          "type": "glob",
+          "required": true,
+          "description": "Glob pattern over the relative path.",
+          "example": "**/Temp/**"
+        },
+        {
+          "name": "case_sensitive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Match case exactly."
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "size.compare",
+      "title": "File size",
+      "description": "Compares the file size with a value.",
+      "category": "Size",
+      "params": [
+        {
+          "name": "operator",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq"
+          ],
+          "description": "gt, gte, lt, lte or eq.",
+          "example": "gt"
+        },
+        {
+          "name": "bytes",
+          "type": "bytes",
+          "required": true,
+          "description": "Size in bytes.",
+          "example": 1048576
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "condition",
+      "kind": "variable.compare",
+      "title": "Metadata matches",
+      "description": "Compares any automation variable (see the variable reference) with a value.",
+      "category": "Advanced",
+      "params": [
+        {
+          "name": "variable",
+          "type": "variable",
+          "required": true,
+          "description": "Variable name, e.g. file.parent_name or sync.files_failed.",
+          "example": "file.parent_name"
+        },
+        {
+          "name": "operator",
+          "type": "enum",
+          "required": true,
+          "options": [
+            "equals",
+            "not_equals",
+            "contains",
+            "starts_with",
+            "ends_with",
+            "matches",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "exists",
+            "empty"
+          ],
+          "description": "Comparison. matches uses a glob; gt/lt compare numbers or dates.",
+          "example": "equals"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "required": false,
+          "description": "Value to compare with (ignored for exists/empty).",
+          "example": "Valorant"
+        },
+        {
+          "name": "case_sensitive",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Match case exactly for text comparisons."
+        },
+        {
+          "name": "negate",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Invert the result of the condition."
+        }
+      ],
+      "contexts": [
+        "file",
+        "sync",
+        "schedule"
+      ],
+      "ports": [
+        "true",
+        "false"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device",
+        "server"
+      ]
+    }
+  ],
+  "trigger": [
+    {
+      "type": "trigger",
+      "kind": "file.created",
+      "title": "File created",
+      "description": "A new file appeared in a synchronised folder (fires once the file has stopped changing).",
+      "category": "File events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "file.deleted",
+      "title": "File deleted",
+      "description": "A file was removed locally. Server copies are never deleted by this trigger; use it for notifications or tagging.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "file.extension_matched",
+      "title": "File extension matched",
+      "description": "A file with one of the listed extensions was created or modified.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "extensions",
+          "type": "string_list",
+          "required": true,
+          "description": "Extensions without the dot, case-insensitive.",
+          "example": [
+            "mp4",
+            "mkv"
+          ]
+        },
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "file.modified",
+      "title": "File modified",
+      "description": "An existing synchronised file changed size or modification time.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "file.renamed",
+      "title": "File renamed",
+      "description": "A file was renamed or moved inside a synchronised folder. file.old_path holds the previous relative path.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "file.size_threshold",
+      "title": "File size threshold reached",
+      "description": "A file was created or modified and is at least the given size.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "bytes",
+          "type": "bytes",
+          "required": true,
+          "description": "Minimum size in bytes.",
+          "example": 104857600
+        },
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "folder.changed",
+      "title": "Folder changed",
+      "description": "Any file event inside a folder whose relative path matches the pattern.",
+      "category": "File events",
+      "params": [
+        {
+          "name": "folder",
+          "type": "glob",
+          "required": false,
+          "default": "**",
+          "description": "Glob matched against the folder's path relative to the sync root (\"\" is the root).",
+          "example": "Valorant/**"
+        },
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "file",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "schedule.interval",
+      "title": "Scheduled interval",
+      "description": "Fires repeatedly on the desktop client at a fixed interval.",
+      "category": "Time",
+      "params": [
+        {
+          "name": "every_minutes",
+          "type": "integer",
+          "required": true,
+          "min": 5,
+          "max": 10080,
+          "description": "Interval in minutes (5 minutes to 7 days).",
+          "example": 60
+        }
+      ],
+      "context": "schedule",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation"
+      ],
+      "runtimes": [
+        "device",
+        "server"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "sync.completed",
+      "title": "Synchronisation completed",
+      "description": "A sync run finished with no failed transfers.",
+      "category": "Sync events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "sync",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    },
+    {
+      "type": "trigger",
+      "kind": "sync.failed",
+      "title": "Synchronisation failed",
+      "description": "A sync run finished with one or more failed transfers, or could not run.",
+      "category": "Sync events",
+      "params": [
+        {
+          "name": "configs",
+          "type": "string_list",
+          "required": false,
+          "description": "Only fire for these sync configuration names. Empty means every sync configuration the automation is attached to.",
+          "example": [
+            "Medal Clips"
+          ]
+        }
+      ],
+      "context": "sync",
+      "ports": [
+        "next"
+      ],
+      "min_schema_version": 1,
+      "required_modules": [
+        "automation",
+        "sync"
+      ],
+      "runtimes": [
+        "device"
+      ]
+    }
+  ]
+}

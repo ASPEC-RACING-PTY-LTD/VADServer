@@ -1,0 +1,46 @@
+{
+  "epoch_keys": [
+    {
+      "epoch": 1,
+      "k_chain": "d3ae25707c7e3fd7d95fbcbe74b74dc9e0706d59f549833d70b216e519324c98",
+      "k_data": "11660702648005ea077e13d6a27c0859f2afce6f1befa1ce83fd2539696fd37d",
+      "k_meta": "4d9b84cf7a272ffc961321acf2eb8ac1829bf8e83182d2cb17aeac940d968a42"
+    },
+    {
+      "epoch": 2,
+      "k_chain": "bc0b06944d74f3d906b937b5d085e82faf4f06dd59830b70b3ab5b20cb8be97a",
+      "k_data": "0e0a5c2a9ae49bd27848a20e01e707c22157ed97e6928fba0acdeac3066cd59d",
+      "k_meta": "d8a1b029f226e2732570e85a96315e69fbaa9fc891cee3771e9db41315ad09f6"
+    }
+  ],
+  "inputs": {
+    "device_box_seed": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+    "device_sign_seed": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+    "dk": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "recovery_secret": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+    "rmk_1": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "rmk_2": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "sek_seed": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+    "sik_seed": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+  },
+  "recipients": {
+    "device_box_priv": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e5f",
+    "device_box_pub": "493e82fc74464a59268817623d2053c5eb8e2cc4a988b4fee179ec6b010d531d",
+    "device_sign_pub": "dde3bccec7f3a66a1115f45d720f4dc135c3ae7c4e22dca38fdb1efd6a495ff8",
+    "recovery_priv": "08443540d834d6b55be753414d22f526b7f325f290aa177a1852bc183ffcfa6b",
+    "recovery_pub": "70b41f2d562aae4cd707eeecc76a40fb3453623bdbbe0c692948e515c8f42737",
+    "sek_priv": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbe7f",
+    "sek_pub": "605a725d2a4adfeeb1a29e17edd621c1b7593ee8cdbc44ac6c4ab6e2f805d23c",
+    "sek_sig": "dd36089abdb513849938378dc6fd87bfc9890e1d522748aca6bec189222e53ed147aadf9211484148dfb8ba296753c76a447e7894e12c89879d583d0e683b303",
+    "sek_version": 1,
+    "sik_pub": "13d9908a70925992ed546007d27f50da68ba7217ef62ac3cca784529ff10471c"
+  },
+  "repo_keys": {
+    "k_chunker": "dd650b49c480c3bea1191bb29c652716921fbb67a35182116c1e97612b2fa21d",
+    "k_fh": "9138bd079d30d48a901cf841733c09e4ce05d30ed1ddcedfd19677a01bc1547a",
+    "k_id": "24227244f372124c8eca8f5b6766a1b2cdc577018c647a6de85a192d287c1416",
+    "k_mac": "b27ec1858922c2f8f788237292e4805d62ee89eb88ff8ac85ede14ce1df0ad8b"
+  },
+  "repo_uuid": "00000000-0000-4000-8000-000000000000",
+  "vector": 1
+}

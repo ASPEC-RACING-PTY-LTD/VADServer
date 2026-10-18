@@ -13,8 +13,10 @@ concurrency:
 permissions:
   contents: read
 
-# The shared SDK (github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk) is required
-# through `replace => ../VaultDock/sdk` until sdk/v0.1.0 is published. While
+# The shared SDK (github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk) is vendored
+# in ./sdk (replace => ./sdk), so no sibling checkout is needed. The steps
+# below only apply if go.mod is switched back to `replace => ../VaultDock/sdk`.
+# While
 # that replace is in go.mod, jobs that compile Go check out the VaultDock
 # repository next to this one:
 #   $GITHUB_WORKSPACE/vad-server   this repository

@@ -1,0 +1,48 @@
+{
+  "key_files": [
+    {
+      "bundle_json": "{\"epoch\":1,\"rmk\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\",\"dk\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "key_file": "{\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"key_id\":\"86ed7f4efa380e351ede958963540e83\",\"kind\":\"device\",\"epoch\":1,\"created\":0,\"label\":\"DESKTOP-ABC\",\"recipient_pub\":\"ST6C/HRGSlkmiBdiPSBTxeuOLMSpiLT+4XnsawENUx0=\",\"epk\":\"nOLlGtNnfmLoT16GO/xf/KtzimdEDXc9DmRH3elxfCI=\",\"device\":{\"id\":3,\"sign_pub\":\"3eO8zsfzpmoRFfRdcg9NwTXDrnxOItyjj9se/WpJX/g=\"},\"wrapped\":\"eci7W1eH5q6AOa64kKwZPcErLf/Qm/warr8GNPuNUEp6Al5kp0RfKRrcRVJ6CwNNv2rVbwH+LWXIeIlGyns1Jzxzd03tfxHoFKoKyaceNWFknWUpI88MV/zn3q7BtFI9ZvAed1jhbY3jU3QRiXcrq9ZKxJ8duquoy6DT1FM41YfYdgOL9R6Mh10A+CzM4c8yD8G0lCTOyM6KpXUj\"}",
+      "name": "device",
+      "oid": "75c3cdea4f0ab9d533be3e6b59bc8e2c41823b2c139ad6438e5f9e2942bf3b01",
+      "recipient_priv": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e5f",
+      "rng_label": "keyfile-device"
+    },
+    {
+      "bundle_json": "{\"epoch\":1,\"rmk\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\",\"dk\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "key_file": "{\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"key_id\":\"11a367dbf352602b48ec90ded7c006c6\",\"kind\":\"escrow\",\"epoch\":1,\"created\":0,\"label\":\"server\",\"recipient_pub\":\"YFpyXSpK3+6xop4X7dYhwbdZPujNvESsbEq24vgF0jw=\",\"epk\":\"251YM5a2vmR+RwZS10J2kV07AicqFk6ui9ZYKGZAOVQ=\",\"server\":{\"sik_pub\":\"E9mQinCSWZLtVGAH0n9Q2mi6chfvYqw8ynhFKf8QRxw=\",\"sek_sig\":\"3TYImr21E4SZODeNxv2Hv8mJDh1SJ0ispr7BiSIuU+0Ueq35IRSEFI37i6KWdTx2pEfniU4SyJh51YPQ5oOzAw==\",\"sek_version\":1},\"wrapped\":\"LthfbQ2lN8Y7nzRfOj/FTOkw3CSb6UK7MNS9is4nOoXh0y9HtDj/+Hhyw1/UbfDd9y0sSrq4KNkinn6I/K0pWk4//w1cf10PDce62IkImjj+IzN1crP/QhSbPd6Y6XCYIEZJwkkEPLzp1HfGQgjGGtogi/4fxm1nQyFvzww7ihl29f7OainIHhQhLTqgUYYqxtfpsGqy7K+I95a9\"}",
+      "name": "escrow-full",
+      "oid": "5207bfa8630e4fd660a204a9313d560a830322a489e06db6277d279494bf82ea",
+      "recipient_priv": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbe7f",
+      "rng_label": "keyfile-escrow-full"
+    },
+    {
+      "bundle_json": "{\"epoch\":1,\"k_meta\":\"TZuEz3onL/yWEyGs8uuKwYKb+OgxgtLLF66slA2WikI=\"}",
+      "key_file": "{\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"key_id\":\"e21e0fd824e238546449f76bfdff1720\",\"kind\":\"escrow\",\"epoch\":1,\"created\":0,\"label\":\"server\",\"recipient_pub\":\"YFpyXSpK3+6xop4X7dYhwbdZPujNvESsbEq24vgF0jw=\",\"epk\":\"3qEw02MU57e+ZrymiO7QPX1X68mpIvmJG9ex8ToI7BQ=\",\"server\":{\"sik_pub\":\"E9mQinCSWZLtVGAH0n9Q2mi6chfvYqw8ynhFKf8QRxw=\",\"sek_sig\":\"3TYImr21E4SZODeNxv2Hv8mJDh1SJ0ispr7BiSIuU+0Ueq35IRSEFI37i6KWdTx2pEfniU4SyJh51YPQ5oOzAw==\",\"sek_version\":1},\"wrapped\":\"cUzcysWuhu8rpc+2g3S2IgEL6Z6FQL7Q5pXjbqfgGNPFlYlmcN5l+Im7RsI22+U8XWwVYHUXE3gQpgHQhHhtdCWeXD1qRNu2hHang093IM2sR0RrWvKAsruKuwl8hhAIK722bYzL2eX3rY8=\"}",
+      "name": "escrow-meta",
+      "oid": "9bbbefffa949b1b21e7ee17079fd192c2dfbdb4c5d353883542822ba4b87d6e5",
+      "recipient_priv": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbe7f",
+      "rng_label": "keyfile-escrow-meta"
+    },
+    {
+      "bundle_json": "{\"epoch\":1,\"rmk\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\",\"dk\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "key_file": "{\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"key_id\":\"1fbc283e721859c0bf1ad3ceb6877f53\",\"kind\":\"recovery\",\"epoch\":1,\"created\":0,\"label\":\"recovery key\",\"recipient_pub\":\"cLQfLVYqrkzXB+7sx2pA+zRTYjvbvgxpKUjlFcj0Jzc=\",\"epk\":\"AeEkevJanEdkGtUricKWk1UBpb8a+gCL9on026qSeBA=\",\"wrapped\":\"aZb0KLBC+nGAMSxRd8YQN3ikPo5TpTaH90AHRUX6COX74vRYz2WPsHuUJCnGTElpMMynZ0yWmvgPYsQcqrQ+iOz/OPk15HDdKcIBqQUvBD5Gup42ffMME675DICOmIOEv0dchxVcY4E516f0qdr4Tmzf6TXEVGPUCQz1VqCE13Hh8OMJq/rd/+wFveolwu2gGON6QFf7ndULwP4I\"}",
+      "name": "recovery",
+      "oid": "c26476029a59456ddbddc2bc8890ae49f5ecb81ea080393e8c9c1d6de5279051",
+      "recipient_priv": "08443540d834d6b55be753414d22f526b7f325f290aa177a1852bc183ffcfa6b",
+      "rng_label": "keyfile-recovery"
+    },
+    {
+      "bundle_json": "{\"epoch\":1,\"rmk\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\",\"dk\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\"}",
+      "key_file": "{\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"key_id\":\"6aac59c46e2e43e577a872f2c3c18a48\",\"kind\":\"passphrase\",\"epoch\":1,\"created\":0,\"label\":\"passphrase\",\"recipient_pub\":\"EQdMOv7wDbvEM0DlaHRLWOpACrubzr3lQinkGzd2WA0=\",\"epk\":\"Xe8Ai3fjmXyyUzclpQaXjxjB27YPSOut2RSwaxFHRTs=\",\"kdf\":{\"alg\":\"argon2id\",\"t\":1,\"m_kib\":8192,\"p\":4,\"salt\":\"dve55aj4KS/qBASWMfNVeQ==\"},\"wrapped\":\"7DGPRoI81HCzcVpnZ3GJeVWbSAmwI00w5G+FtRZ9iFkOkQ0xNeBS3eLxGQt6RzmOpWf1URy3MKD1Dw65craDePNje//dcgV9MOsm1TK9PzKn+5D8unJ8zh/E+NdPWJgS7ZoFmujAFsMAkn/WBGzXhJWY3NaVlbAg+J7Il0CnAyacn931+aHiPtxRISHZrCtBvhFacAAmScr0ztyC\"}",
+      "name": "passphrase",
+      "oid": "2f591a3c8a654e429a51c12e2d9a2a95862f1436ade2e7572b0787cd20b06e5b",
+      "recipient_priv": "a8ea8080753e1610e4803065d9ec944fe5f9c7c2f1aed7fe74788914b40a6557",
+      "rng_label": "keyfile-passphrase"
+    }
+  ],
+  "note": "passphrase KDF uses the §13 test parameters t=1, m=8 MiB; salt from rng_label keyfile-passphrase-kdf",
+  "passphrase": "correct horse battery staple",
+  "repo_uuid": "00000000-0000-4000-8000-000000000000",
+  "vector": 6
+}

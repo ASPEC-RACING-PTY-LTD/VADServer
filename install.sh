@@ -275,36 +275,8 @@ with_build_source() {
 	return "$rc"
 }
 
-SDK_REPO="${VAULTDOCK_SDK_REPO:-ASPEC-RACING-PTY-LTD/VaultDock}"
-SDK_REF="${VAULTDOCK_SDK_REF:-main}"
-
-# docker_build VERSION SRC builds the image. Until the SDK is published as a
-# Go module, go.mod replaces it with ../VaultDock/sdk, so the build gets it as
-# the `sdk` build context: VAULTDOCK_SDK_DIR, else a VaultDock checkout beside
-# SRC, else the SDK_REPO source at SDK_REF (downloaded, then removed).
-docker_build() {
-	local sdk="${VAULTDOCK_SDK_DIR:-}" tmp="" rc=0
-	if [ -z "$sdk" ] && [ -f "$2/../VaultDock/sdk/go.mod" ]; then
-		sdk=$(cd -- "$2/../VaultDock/sdk" && pwd -P)
-	fi
-	if [ -z "$sdk" ] && grep -q '=> \.\./VaultDock/sdk' "$2/go.mod" 2>/dev/null; then
-		tmp=$(mktemp -d)
-		info "Downloading the VaultDock SDK ($SDK_REPO@$SDK_REF) for the build"
-		if download "https://github.com/$SDK_REPO/archive/$SDK_REF.tar.gz" "$tmp/sdk.tar.gz" &&
-			tar -xzf "$tmp/sdk.tar.gz" -C "$tmp" --strip-components=1 && [ -f "$tmp/sdk/go.mod" ]; then
-			sdk="$tmp/sdk"
-		else
-			rm -rf -- "$tmp"
-			die "Could not get the VaultDock SDK. Clone $SDK_REPO next to this folder (../VaultDock) or set VAULTDOCK_SDK_DIR to its sdk folder."
-		fi
-	fi
-	if [ -n "$sdk" ]; then
-		DOCKER_BUILDKIT=1 docker buildx build --load --build-context "sdk=$sdk" -t vaultdock:local --build-arg "VERSION=$1" "$2" || rc=$?
-	else
-		DOCKER_BUILDKIT=1 docker build -t vaultdock:local --build-arg "VERSION=$1" "$2" || rc=$?
-	fi
-	[ -z "$tmp" ] || rm -rf -- "$tmp"
-	return "$rc"
+docker_build() { # docker_build VERSION SRC
+	DOCKER_BUILDKIT=1 docker build -t vaultdock:local --build-arg "VERSION=$1" "$2"
 }
 
 # build_image: a registry image (VAULTDOCK_IMAGE) is reused or pulled, falling

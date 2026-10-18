@@ -1,0 +1,37 @@
+{
+  "chain_1": {
+    "ad": "vd1:chain:00000000-0000-4000-8000-000000000000",
+    "epoch": 1,
+    "oid": "e2b1b0e6f84e75298c33c7eb1d44fa2e50b7b9c39fd4848f93e331a53fc0e752",
+    "plaintext": "{\"v\":1,\"epoch\":1,\"prev_rmk\":null}",
+    "rng_label": "chain_1",
+    "sealed": "0101000000d27264b5f27bbf05d76c55948d460100f74ff3473ce69a96ab297f005b52494fcba4323f3d843bbf67804df3496cb891720d8a02c53ce71ac9a7f2d8bb28f2c672e65a2dbfe2291095"
+  },
+  "chain_2": {
+    "ad": "vd1:chain:00000000-0000-4000-8000-000000000000",
+    "epoch": 2,
+    "oid": "88f3d4cccd40854ad8ba47974bad787477cce5944bbc0be4728164db6c162578",
+    "plaintext": "{\"v\":1,\"epoch\":2,\"prev_rmk\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\"}",
+    "rng_label": "chain_2",
+    "sealed": "0102000000cb353446f71fdb50bbed2634e0bb7fbdf74d7dd4f7a220f73470f6d28e63249c84757cb00d3953b54eb4e7293b531cca464f7a72446f52118a7f6f2f088f6973889c99a7acf6f8187df42ad9c3984215912cff1510e86ae3db23253c925495186dacba19ab7883d735e44fd6c90dfc272e1ca1"
+  },
+  "metachain_1": {
+    "ad": "vd1:metachain:00000000-0000-4000-8000-000000000000",
+    "epoch": 1,
+    "oid": "a6d04e31635c57eb75bbb1767c905ad08c346b1ee85e2e8248254ef342032f08",
+    "plaintext": "{\"v\":1,\"epoch\":1,\"prev_k_meta\":null}",
+    "rng_label": "metachain_1",
+    "sealed": "01010000000ccea5a3507d5007815f95cd0f60ad71c43e9e6ad65c71c909e850c5ca247868acbdfe3a2844fe0bb8bc78fc6bec869bd96f17f0fc06e883b514507fc6b952ef9a5f509de536699994916827"
+  },
+  "metachain_2": {
+    "ad": "vd1:metachain:00000000-0000-4000-8000-000000000000",
+    "epoch": 2,
+    "oid": "d99094b9ec4a1027bf484cf161e074e8f665bd28b800b058bebb34ca5d8fe067",
+    "plaintext": "{\"v\":1,\"epoch\":2,\"prev_k_meta\":\"TZuEz3onL/yWEyGs8uuKwYKb+OgxgtLLF66slA2WikI=\"}",
+    "rng_label": "metachain_2",
+    "sealed": "0102000000ad932f6200fe98c72011590208baf0ad0808637c6d259e404ff57c30b257f369fa85dfcbc5f7e6fcbdb9b9abf0e01b28e6cba6237fc5744d19e43714e1787e4cb7a87beeaa3a0d9903c91f89d8820eba141451cd35b044f3d6c09995d8a3b2a020a5add1cf1e16d3e9a66a709cd66071609b3fb556a9"
+  },
+  "repo_uuid": "00000000-0000-4000-8000-000000000000",
+  "revision": "1.2",
+  "vector": 7
+}

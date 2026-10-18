@@ -27,4 +27,4 @@ require (
 
 // Temporary until sdk/v0.1.0 is published: build against the sibling VaultDock
 // checkout. Remove this replace and require the tagged version afterwards.
-replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ../VaultDock/sdk
+replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ./sdk

@@ -84,7 +84,7 @@ install.sh           installer / upgrader / uninstaller
 Dockerfile, docker-compose.yml
 ```
 
-Shared code (automation engine, API client, request signing, backup format) is the Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk` in the `VaultDock` repository.
+Shared code (automation engine, API client, request signing, backup format) is the Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk` from the `VaultDock` repository. A copy lives in `sdk/` so this repository builds on its own; after changing the SDK in VaultDock, run `scripts/sync-sdk.sh` and commit.
 
 ## Licence
 

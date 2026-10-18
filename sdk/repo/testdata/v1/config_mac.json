@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "config": "{\"format\":\"vaultdock.repo\",\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"created\":1760745600000,\"escrow_mode\":\"full\",\"chunker\":{\"alg\":\"vd-fastcdc-1\",\"min\":524288,\"avg\":1048576,\"max\":8388608},\"compression\":\"zstd\",\"aead\":\"xchacha20poly1305\",\"pack_target\":16777216,\"pack_max\":67108864,\"recovery_pub\":\"cLQfLVYqrkzXB+7sx2pA+zRTYjvbvgxpKUjlFcj0Jzc=\",\"mac\":\"6dde9bdc4cf8b4527a6e4daaa20846f5641994075e3728dbe4d15fb36b0c6f7a\"}",
+      "escrow_mode": "full",
+      "mac": "6dde9bdc4cf8b4527a6e4daaa20846f5641994075e3728dbe4d15fb36b0c6f7a",
+      "mac_input": "{\"aead\":\"xchacha20poly1305\",\"chunker\":{\"alg\":\"vd-fastcdc-1\",\"avg\":1048576,\"max\":8388608,\"min\":524288},\"compression\":\"zstd\",\"created\":1760745600000,\"escrow_mode\":\"full\",\"format\":\"vaultdock.repo\",\"pack_max\":67108864,\"pack_target\":16777216,\"recovery_pub\":\"cLQfLVYqrkzXB+7sx2pA+zRTYjvbvgxpKUjlFcj0Jzc=\",\"repo\":\"00000000-0000-4000-8000-000000000000\",\"v\":1}"
+    },
+    {
+      "config": "{\"format\":\"vaultdock.repo\",\"v\":1,\"repo\":\"00000000-0000-4000-8000-000000000000\",\"created\":1760745600000,\"escrow_mode\":\"metadata\",\"chunker\":{\"alg\":\"vd-fastcdc-1\",\"min\":524288,\"avg\":1048576,\"max\":8388608},\"compression\":\"zstd\",\"aead\":\"xchacha20poly1305\",\"pack_target\":16777216,\"pack_max\":67108864,\"recovery_pub\":\"cLQfLVYqrkzXB+7sx2pA+zRTYjvbvgxpKUjlFcj0Jzc=\",\"mac\":\"dd3fb48a04c2e5cfc1f61d4bb0e8e872c009dc398ba76d50add8a6a772ea0763\"}",
+      "escrow_mode": "metadata",
+      "mac": "dd3fb48a04c2e5cfc1f61d4bb0e8e872c009dc398ba76d50add8a6a772ea0763",
+      "mac_input": "{\"aead\":\"xchacha20poly1305\",\"chunker\":{\"alg\":\"vd-fastcdc-1\",\"avg\":1048576,\"max\":8388608,\"min\":524288},\"compression\":\"zstd\",\"created\":1760745600000,\"escrow_mode\":\"metadata\",\"format\":\"vaultdock.repo\",\"pack_max\":67108864,\"pack_target\":16777216,\"recovery_pub\":\"cLQfLVYqrkzXB+7sx2pA+zRTYjvbvgxpKUjlFcj0Jzc=\",\"repo\":\"00000000-0000-4000-8000-000000000000\",\"v\":1}"
+    }
+  ],
+  "inputs": {
+    "created": 1760745600000,
+    "dk": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "recovery_secret": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"
+  },
+  "k_mac": "b27ec1858922c2f8f788237292e4805d62ee89eb88ff8ac85ede14ce1df0ad8b",
+  "note": "mac = hex(HMAC-SHA256(K_mac, JCS(config without mac))); config is the stored bytes; created is Unix ms",
+  "recovery_pub": "70b41f2d562aae4cd707eeecc76a40fb3453623bdbbe0c692948e515c8f42737",
+  "repo_uuid": "00000000-0000-4000-8000-000000000000",
+  "vector": 9
+}
