@@ -1,0 +1,17 @@
+{
+  "$comment": "Files install.sh installs into app/ and how upgrades treat them. Each entry is a flat object (no arrays) so install.sh can read it without jq. policy: replace = installer internals, always overwritten by the shipped version (a locally modified copy is saved next to it as <path>.local and in the upgrade backup); keep-modified = if the installed copy differs from every known shipped version (the checksum recorded at the last install in app/.managed-files.sha256, or one of known_sha256, space-separated), it is kept and the shipped version is written next to it as <path>.new; merge = .env, add-only merge driven by deploy/env.schema.json; user = never touched, carried over unchanged. legacy_path = where an older release kept the file; it is migrated from there. known_sha256 lists earlier shipped versions (LF line endings) that count as unmodified. install.sh downloads this file first and installs the replace and keep-modified entries it lists; RUNTIME_FILES in install.sh is only the fallback for older layouts and must stay in sync (scripts/test-install checks it).",
+  "schema_version": 1,
+  "files": [
+    { "path": "docker-compose.yml", "policy": "keep-modified", "known_sha256": "f0a1dedfd04c6a8fd39efd53c2fbaddefe478d6d3a54e2e3bc060199b26bd4b6 e4e4539147d38638b515a052337355b202314b1e0585932c16d2e922c916adfe", "description": "Default deployment: only the vaultdock service. Customise it in docker-compose.override.yml; a locally edited copy is kept and the shipped version is written as docker-compose.yml.new." },
+    { "path": "install.sh", "policy": "replace", "description": "Installer and upgrade script." },
+    { "path": "deploy/env.schema.json", "policy": "replace", "description": "Environment variable schema." },
+    { "path": "deploy/managed-files.json", "policy": "replace", "description": "This list." },
+    { "path": "deploy/integrations/caddy/compose.caddy.yml", "policy": "keep-modified", "description": "Opt-in Caddy reverse proxy (VAULTDOCK_INTEGRATIONS=caddy). Same volumes as the former bundled caddy profile." },
+    { "path": "deploy/integrations/caddy/Caddyfile", "policy": "keep-modified", "legacy_path": "deploy/Caddyfile", "known_sha256": "816bd1bf84fef1471026f0138e5458be7ef4cc965f186e02c208f198febad10e", "description": "Caddy configuration for the caddy integration." },
+    { "path": "deploy/integrations/cloudflared/detect.sh", "policy": "replace", "description": "Read-only detection of an existing cloudflared (systemd, snap, Docker, process), used by install.sh integrations." },
+    { "path": "deploy/integrations/cloudflared/compose.cloudflared-net.yml", "policy": "keep-modified", "description": "Opt-in: join VaultDock to the Docker network of an existing cloudflared (VAULTDOCK_INTEGRATIONS=cloudflared-net, VAULTDOCK_TUNNEL_NETWORK)." },
+    { "path": ".env", "policy": "merge", "description": "Configuration. Existing values are never changed; missing variables are appended; obsolete ones are removed only with per-variable approval." },
+    { "path": "docker-compose.override.yml", "policy": "user", "description": "Your own compose changes (extra disks, labels)." },
+    { "path": "deploy/env-approvals", "policy": "user", "description": "Optional: obsolete variable names approved for removal from .env, one per line." }
+  ]
+}

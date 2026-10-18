@@ -1,0 +1,160 @@
+name: Release
+
+# Push a tag such as v1.2.0 to publish a server release:
+#   - ghcr.io/aspec-racing-pty-ltd/vad-server:<version> (+ :latest for
+#     non-prerelease tags), linux/amd64 + linux/arm64, with OCI labels;
+#   - a GitHub release of ASPEC-RACING-PTY-LTD/vad-server carrying install.sh,
+#     docker-compose.yml, env.example, deploy.tar.gz and SHA256SUMS.
+# `install.sh upgrade` picks it up from here.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build, for example v1.2.0
+        required: true
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  IMAGE: ghcr.io/aspec-racing-pty-ltd/vad-server
+  SDK_MODULE: github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk
+
+jobs:
+  server-image:
+    name: Server image (amd64 + arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+          path: vad-server
+      - name: Version
+        id: v
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$ ]] || { echo "::error::$TAG is not a vMAJOR.MINOR.PATCH tag"; exit 1; }
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+      # Until sdk/v0.1.0 is published, go.mod replaces the SDK with ../VaultDock/sdk
+      # and the image is built with that sibling checkout as the `sdk` build
+      # context. Without the replace, the Dockerfile fetches the SDK from the
+      # module proxy and no sibling is used.
+      #   vars.VAULTDOCK_SDK_REF      VaultDock ref to build against (pin a tag for releases; default main)
+      #   secrets.VAULTDOCK_SDK_TOKEN read token for VaultDock if it is private
+      - name: Detect local SDK replace
+        id: sdk
+        working-directory: vad-server
+        run: |
+          if grep -Eq "^replace[[:space:]]+${SDK_MODULE}[[:space:]]+=>[[:space:]]+\.\./VaultDock/sdk" go.mod; then
+            echo "local=true" >> "$GITHUB_OUTPUT"
+            echo "context=sdk=${GITHUB_WORKSPACE}/VaultDock/sdk" >> "$GITHUB_OUTPUT"
+          else
+            echo "local=false" >> "$GITHUB_OUTPUT"
+            echo "context=" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.sdk.outputs.local == 'true'
+        with:
+          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
+          token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
+          path: VaultDock
+          sparse-checkout: sdk
+      - name: SDK revision
+        if: steps.sdk.outputs.local == 'true'
+        run: echo "Building against VaultDock $(git -C VaultDock rev-parse HEAD) (sdk/ via local replace)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.v.outputs.version }}
+            type=raw,value=latest,enable=${{ steps.v.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.title=VaultDock server
+            org.opencontainers.image.description=Self-hosted file storage and intelligent synchronisation
+            org.opencontainers.image.vendor=ASPEC Racing Pty Ltd
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+            org.opencontainers.image.source=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
+            org.opencontainers.image.url=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+          annotations: |
+            org.opencontainers.image.title=VaultDock server
+            org.opencontainers.image.description=Self-hosted file storage and intelligent synchronisation
+            org.opencontainers.image.vendor=ASPEC Racing Pty Ltd
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+            org.opencontainers.image.source=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
+            org.opencontainers.image.url=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+      # Build stages cross-compile natively (see Dockerfile), so arm64 needs no emulation.
+      - uses: docker/build-push-action@v6
+        with:
+          context: vad-server
+          build-contexts: ${{ steps.sdk.outputs.context }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: VERSION=${{ steps.v.outputs.version }}
+          cache-from: type=gha,scope=server-image
+          cache-to: type=gha,scope=server-image,mode=max
+          provenance: false
+
+  publish:
+    name: Publish release
+    needs: [server-image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      # GitHub renames release assets that start with a dot, so .env.example is
+      # published as env.example. deploy.tar.gz unpacks to deploy/…; it is
+      # built reproducibly (sorted, fixed owner and commit timestamp).
+      - name: Assets
+        run: |
+          mkdir -p assets
+          cp install.sh docker-compose.yml assets/
+          cp .env.example assets/env.example
+          ts=$(git log -1 --format=%ct)
+          tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$ts" \
+              --format=gnu -cf - deploy | gzip -n9 > assets/deploy.tar.gz
+          tar -tzf assets/deploy.tar.gz
+          cd assets && sha256sum -- install.sh docker-compose.yml env.example deploy.tar.gz > SHA256SUMS && cat SHA256SUMS
+      - name: Create or update the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ASPEC-RACING-PTY-LTD/vad-server
+        run: |
+          flags=()
+          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
+          notes="Image: \`${IMAGE}:${TAG#v}\` (linux/amd64, linux/arm64)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" assets/* --clobber
+          else
+            gh release create "$TAG" assets/* --verify-tag --generate-notes --notes "$notes" \
+              --title "VaultDock server ${TAG#v}" "${flags[@]}"
+          fi

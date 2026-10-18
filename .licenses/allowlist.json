@@ -1,0 +1,97 @@
+{
+  "_comment": "Used by .licenses/check.mjs (P0-31). 'allowed' = SPDX ids accepted for incorporated code; anything else fails unless listed under 'exceptions' for that package. 'spdx' only overrides how a licence is displayed.",
+  "name": "vad-server",
+  "allowed": [
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Apache-2.0",
+    "0BSD",
+    "Zlib",
+    "Unlicense",
+    "CC0-1.0"
+  ],
+  "forbidden": [
+    "GPL",
+    "LGPL",
+    "AGPL",
+    "SSPL",
+    "CC-BY-NC",
+    "BSD-4-Clause"
+  ],
+  "needsOwnerApproval": [
+    "MPL-2.0"
+  ],
+  "go": [
+    {
+      "module": ".",
+      "goos": [
+        "linux",
+        "windows"
+      ],
+      "tags": [
+        ""
+      ]
+    }
+  ],
+  "npm": [
+    {
+      "dir": "web",
+      "bundledDev": [
+        "tailwindcss"
+      ]
+    }
+  ],
+  "ignoreModulePrefixes": [
+    "github.com/ASPEC-RACING-PTY-LTD/"
+  ],
+  "notBundled": [
+    "@types/",
+    "csstype"
+  ],
+  "exceptions": {
+    "Go standard library and runtime": {
+      "allow": [
+        "LicenseRef-Go-Patents"
+      ],
+      "reason": "Go's PATENTS file is an additional royalty-free patent grant, not a restriction."
+    },
+    "modernc.org/sqlite": {
+      "allow": [
+        "LicenseRef-Public-Domain"
+      ],
+      "reason": "LICENSE-SQLITE: the SQLite amalgamation (transpiled into the module) is dedicated to the public domain."
+    }
+  },
+  "allowedInNoticeBundles": [],
+  "excludeFiles": {
+    "modernc.org/sqlite": [
+      "LICENSE-SQLITE_VEC",
+      "LICENSE-3RD-PARTY.md"
+    ]
+  },
+  "manualReview": {
+    "modernc.org/sqlite": "LICENSE-SQLITE_VEC and LICENSE-3RD-PARTY.md excluded: sqlite-vec and the vfs bridge are only linked when modernc.org/sqlite/vec or /vfs is imported (not imported); the remaining linked components of its LICENSE-3RD-PARTY.md are listed here as their own entries.",
+    "lightningcss": "MPL-2.0 build tool (Tailwind/Vite CSS minifier). Dev-only; its code is not shipped, only the CSS it outputs. Not incorporated.",
+    "lightningcss-win32-x64-msvc": "MPL-2.0 build tool (Tailwind/Vite CSS minifier). Dev-only; its code is not shipped, only the CSS it outputs. Not incorporated."
+  },
+  "spdx": {
+    "git.sr.ht/~jackmordaunt/go-toast/v2": "MIT OR Unlicense",
+    "github.com/wailsapp/wails/v2": "MIT (bundled subcomponents: MIT, Apache-2.0)",
+    "github.com/wailsapp/go-webview2": "MIT (webviewloader: ISC)",
+    "modernc.org/sqlite": "BSD-3-Clause (embedded SQLite: public domain)",
+    "modernc.org/libc": "BSD-3-Clause (bundled: Go BSD-3-Clause, musl MIT, go-netdb MIT, nixpkgs MIT)",
+    "modernc.org/memory": "BSD-3-Clause",
+    "github.com/klauspost/compress": "BSD-3-Clause (gzhttp: Apache-2.0; s2/snappy parts: BSD-3-Clause, MIT)",
+    "Go standard library and runtime": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/crypto": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/net": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/sys": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/text": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/time": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/term": "BSD-3-Clause (+ Go PATENTS grant)",
+    "golang.org/x/sync": "BSD-3-Clause (+ Go PATENTS grant)",
+    "lucide-react": "ISC (Feather-derived icons: MIT)"
+  }
+}

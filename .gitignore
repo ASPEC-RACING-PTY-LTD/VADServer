@@ -1,0 +1,19 @@
+# local data and builds
+.dev-data/
+/bin/
+/dist/
+*.exe
+*.db
+*.db-wal
+*.db-shm
+.env
+desktop/build/bin/
+desktop/frontend/dist/*
+!desktop/frontend/dist/.keep
+desktop/frontend/node_modules/
+node_modules/
+web/dist/*
+!web/dist/.keep
+
+# local tooling
+.claude/

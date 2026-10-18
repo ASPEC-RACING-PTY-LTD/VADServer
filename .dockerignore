@@ -1,0 +1,24 @@
+# The image build needs: go.mod, go.sum, cmd/, internal/, web/ (sources, not
+# node_modules or dist), LICENSE and THIRD_PARTY_NOTICES.md. The SDK arrives
+# through the separate `sdk` build context, never from this one.
+.git
+.github
+.claude
+.dev-data
+.env
+.env.*
+!.env.example
+backups
+bin
+dist
+*.exe
+*.db
+*.db-wal
+*.db-shm
+**/node_modules
+web/dist
+web/test-results
+web/playwright-report
+web/blob-report
+web/tsconfig.tsbuildinfo
+desktop

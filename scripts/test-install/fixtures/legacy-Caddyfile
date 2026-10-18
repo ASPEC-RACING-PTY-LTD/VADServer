@@ -1,0 +1,16 @@
+# Reverse proxy with automatic HTTPS (Let's Encrypt). VAULTDOCK_DOMAIN must
+# resolve to this host and ports 80/443 must be reachable.
+{$VAULTDOCK_DOMAIN} {
+	encode zstd gzip
+	# Large chunk uploads and long downloads: no body limits or short timeouts.
+	request_body {
+		max_size 128MB
+	}
+	reverse_proxy vaultdock:8080 {
+		header_up X-Real-IP {remote_host}
+		transport http {
+			read_timeout 10m
+			write_timeout 0
+		}
+	}
+}

@@ -1,0 +1,240 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch or pull request cancels the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# The shared SDK (github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk) is required
+# through `replace => ../VaultDock/sdk` until sdk/v0.1.0 is published. While
+# that replace is in go.mod, jobs that compile Go check out the VaultDock
+# repository next to this one:
+#   $GITHUB_WORKSPACE/vad-server   this repository
+#   $GITHUB_WORKSPACE/VaultDock    ASPEC-RACING-PTY-LTD/VaultDock (sdk/ only)
+# Once the replace is removed, the sibling checkout is skipped and the SDK
+# comes from the Go module proxy.
+#   vars.VAULTDOCK_SDK_REF     branch, tag or SHA of VaultDock to use (default main)
+#   secrets.VAULTDOCK_SDK_TOKEN read token for VaultDock if it is private
+env:
+  SDK_MODULE: github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk
+
+# All jobs run in parallel; each restores its own dependency caches.
+jobs:
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: vad-server
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: vad-server
+      - name: Detect local SDK replace
+        id: sdk
+        run: |
+          if grep -Eq "^replace[[:space:]]+${SDK_MODULE}[[:space:]]+=>[[:space:]]+\.\./VaultDock/sdk" go.mod; then
+            echo "local=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "local=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.sdk.outputs.local == 'true'
+        with:
+          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
+          token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
+          path: VaultDock
+          sparse-checkout: sdk
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: vad-server/go.mod
+          cache-dependency-path: vad-server/go.sum
+      # web/dist is git-ignored and embedded by web/embed.go (//go:embed all:dist);
+      # the Go packages only need it to exist, the real UI is built in the web job.
+      - name: Placeholder web/dist
+        run: |
+          mkdir -p web/dist
+          [ -e web/dist/index.html ] || echo '<!doctype html><title>VaultDock</title>' > web/dist/index.html
+      - run: go mod download
+      - name: gofmt
+        run: |
+          unformatted=$(git ls-files -z '*.go' | xargs -0 gofmt -l)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go mod tidy check
+        run: go mod tidy -diff
+      - run: go vet ./...
+      - run: go test ./...
+      # Without VAULTDOCK_URL the integration tests compile and skip; they run
+      # against a deployed instance (see tests/integration/integration_test.go).
+      - run: go test -tags integration ./tests/...
+
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint
+
+  installer:
+    name: Installer script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash -n install.sh
+      # shellcheck is preinstalled on the ubuntu runners.
+      - run: shellcheck --severity=error install.sh
+      # The container/VM install harness (P0-33) is optional until it lands.
+      - name: Install harness (dry run)
+        run: |
+          if [ ! -d scripts/test-install ]; then
+            echo "scripts/test-install not present; skipping."
+            exit 0
+          fi
+          mapfile -t scripts < <(find scripts/test-install -type f -name '*.sh' | sort)
+          if [ "${#scripts[@]}" -gt 0 ]; then
+            for f in "${scripts[@]}"; do bash -n "$f"; done
+            shellcheck --severity=error "${scripts[@]}"
+          fi
+          if [ -f scripts/test-install/run.sh ]; then
+            bash scripts/test-install/run.sh --dry-run
+          else
+            echo "scripts/test-install/run.sh not present; skipping the dry run."
+          fi
+
+  image:
+    name: Server image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: vad-server
+      - name: Detect local SDK replace
+        id: sdk
+        working-directory: vad-server
+        run: |
+          if grep -Eq "^replace[[:space:]]+${SDK_MODULE}[[:space:]]+=>[[:space:]]+\.\./VaultDock/sdk" go.mod; then
+            echo "local=true" >> "$GITHUB_OUTPUT"
+            echo "context=sdk=${GITHUB_WORKSPACE}/VaultDock/sdk" >> "$GITHUB_OUTPUT"
+          else
+            echo "local=false" >> "$GITHUB_OUTPUT"
+            echo "context=" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.sdk.outputs.local == 'true'
+        with:
+          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
+          token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
+          path: VaultDock
+          sparse-checkout: sdk
+      - uses: docker/setup-buildx-action@v3
+      - name: Dockerfile checks
+        working-directory: vad-server
+        run: |
+          args=()
+          [ -n "${{ steps.sdk.outputs.context }}" ] && args+=(--build-context "${{ steps.sdk.outputs.context }}")
+          docker buildx build --check "${args[@]}" .
+      # Build only (no push); loaded into the local engine for a smoke run.
+      - uses: docker/build-push-action@v6
+        with:
+          context: vad-server
+          build-contexts: ${{ steps.sdk.outputs.context }}
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: vad-server:ci
+          build-args: VERSION=ci-${{ github.sha }}
+          cache-from: type=gha,scope=server-image
+          cache-to: type=gha,scope=server-image,mode=max
+          provenance: false
+      - name: Smoke test
+        run: |
+          docker run -d --name vd -p 127.0.0.1:8080:8080 vad-server:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then
+              echo
+              docker run --rm --entrypoint /usr/local/bin/vaultdock vad-server:ci version
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs vd
+          exit 1
+      - name: Container logs
+        if: always()
+        run: docker logs vd 2>&1 | tail -n 50 || true
+
+  licences:
+    name: Licences
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: vad-server
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: vad-server
+      - name: Detect local SDK replace
+        id: sdk
+        run: |
+          if grep -Eq "^replace[[:space:]]+${SDK_MODULE}[[:space:]]+=>[[:space:]]+\.\./VaultDock/sdk" go.mod; then
+            echo "local=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "local=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.sdk.outputs.local == 'true'
+        with:
+          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
+          token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
+          path: VaultDock
+          sparse-checkout: sdk
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: vad-server/go.mod
+          cache-dependency-path: vad-server/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vad-server/web/package-lock.json
+      # go list (used by check.mjs) needs the embedded web/dist to exist.
+      - name: Placeholder web/dist
+        run: |
+          mkdir -p web/dist
+          [ -e web/dist/index.html ] || echo '<!doctype html><title>VaultDock</title>' > web/dist/index.html
+      # check.mjs reads licence files from the module cache and node_modules.
+      - run: go mod download
+      - run: npm ci --no-audit --no-fund --ignore-scripts
+        working-directory: vad-server/web
+      - run: bash .licenses/check.sh && bash .licenses/check.sh --notices

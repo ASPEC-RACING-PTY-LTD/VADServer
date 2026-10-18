@@ -1,0 +1,25 @@
+# Opt-in integration: join VaultDock to the Docker network of an existing
+# cloudflared container (VAULTDOCK_INTEGRATIONS=cloudflared-net).
+#
+# Use it when cloudflared runs in Docker on a user-defined bridge network:
+# inside that container 127.0.0.1 is cloudflared itself, so the tunnel must
+# reach VaultDock by its service name instead. install.sh sets
+# VAULTDOCK_TUNNEL_NETWORK to cloudflared's network and adds this file:
+#   docker compose -f docker-compose.yml \
+#     -f deploy/integrations/cloudflared/compose.cloudflared-net.yml up -d vaultdock
+# The tunnel ingress (or dashboard public hostname) then points at
+#   http://vaultdock:8080
+# No cloudflared container is added and cloudflared's own project is never
+# changed. The host port stays published for local health checks.
+
+services:
+  vaultdock:
+    networks:
+      default: {}
+      tunnel:
+        aliases: [vaultdock]
+
+networks:
+  tunnel:
+    external: true
+    name: ${VAULTDOCK_TUNNEL_NETWORK:?set VAULTDOCK_TUNNEL_NETWORK to the Docker network of cloudflared}

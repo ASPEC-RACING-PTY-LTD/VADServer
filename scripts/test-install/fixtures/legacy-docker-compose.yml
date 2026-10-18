@@ -1,0 +1,61 @@
+# VaultDock deployment. Configure via .env (see .env.example); install.sh
+# generates it for you.
+#
+# Data layout on the host:
+#   ${VAULTDOCK_STATE_PATH}   database, generated TLS material   -> /state
+#   ${VAULTDOCK_STORAGE_PATH} user files (put this on your HDD)  -> /storage/default
+# Extra disks can be mounted under /storage/<name> and added as storage
+# locations in the admin console (see docker-compose.override.yml example
+# in docs/deployment.md).
+
+name: vaultdock
+
+services:
+  vaultdock:
+    image: ${VAULTDOCK_IMAGE:-vaultdock:local}
+    build:
+      context: .
+      args:
+        VERSION: ${VAULTDOCK_VERSION:-dev}
+    container_name: vaultdock
+    restart: unless-stopped
+    user: "${VAULTDOCK_UID:-65532}:${VAULTDOCK_GID:-65532}"
+    env_file: ${VAULTDOCK_ENV_FILE:-.env}
+    environment:
+      VAULTDOCK_STATE_DIR: /state
+      VAULTDOCK_DEFAULT_STORAGE: /storage/default
+      VAULTDOCK_STORAGE_ROOTS: /storage
+      VAULTDOCK_LISTEN: ":8080"
+    ports:
+      - "${VAULTDOCK_BIND:-0.0.0.0}:${VAULTDOCK_PORT:-3000}:8080"
+    volumes:
+      - "${VAULTDOCK_STATE_PATH:-./data/state}:/state"
+      - "${VAULTDOCK_STORAGE_PATH:-./data/storage}:/storage/default"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # Optional automatic HTTPS with Let's Encrypt. Enable with:
+  #   COMPOSE_PROFILES=caddy and VAULTDOCK_DOMAIN=vault.example.com in .env
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: ["caddy"]
+    restart: unless-stopped
+    depends_on: [vaultdock]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      VAULTDOCK_DOMAIN: ${VAULTDOCK_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - "${VAULTDOCK_STATE_PATH:-./data/state}/caddy-data:/data"
+      - "${VAULTDOCK_STATE_PATH:-./data/state}/caddy-config:/config"

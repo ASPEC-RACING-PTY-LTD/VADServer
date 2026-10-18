@@ -1,0 +1,28 @@
+# Opt-in integration: Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+#
+# Enable with install.sh (VAULTDOCK_INTEGRATIONS=caddy in .env, plus
+# VAULTDOCK_DOMAIN=vault.example.com). install.sh then adds this file:
+#   docker compose -f docker-compose.yml \
+#     -f deploy/integrations/caddy/compose.caddy.yml up -d
+# VAULTDOCK_DOMAIN must resolve to this host and ports 80/443 must be
+# reachable. Bind VaultDock itself to 127.0.0.1 (VAULTDOCK_BIND).
+#
+# This replaces the former bundled "caddy" Compose profile and uses the same
+# service name and volumes, so existing certificates and Caddy state are kept.
+# Relative paths resolve against the project directory (app/).
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on: [vaultdock]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      VAULTDOCK_DOMAIN: ${VAULTDOCK_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/integrations/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - "${VAULTDOCK_STATE_PATH:-./data/state}/caddy-data:/data"
+      - "${VAULTDOCK_STATE_PATH:-./data/state}/caddy-config:/config"
