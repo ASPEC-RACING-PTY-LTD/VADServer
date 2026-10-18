@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Readiness inputs (api-v1 §11; rev 1.0 §11). The store gathers the facts

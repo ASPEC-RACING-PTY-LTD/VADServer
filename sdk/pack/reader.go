@@ -9,7 +9,7 @@ import (
 	"io"
 	"slices"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // minHeaderLength is the smallest trailer length field: pack_nonce plus a

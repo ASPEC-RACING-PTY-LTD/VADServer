@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/protocol"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/protocol"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // --- repositories (api-v1 §5) ---

@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/keys"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 )

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt/vdcrypttest"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt/vdcrypttest"
 )
 
 type fixture struct {

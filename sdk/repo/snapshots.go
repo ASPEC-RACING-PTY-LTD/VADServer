@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/compress"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // ErrNoDeviceKey means no device key file carries the signing key of a

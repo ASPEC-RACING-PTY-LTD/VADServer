@@ -10,9 +10,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/compress"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // IndexVersion is the index JSON "v" and also the payload type byte

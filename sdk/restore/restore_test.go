@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 type fakeRepo struct {

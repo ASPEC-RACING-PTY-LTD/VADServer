@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Snapshot catalog rows (api-v1 §5.2, §5.4; owner SRV-2, P1-15).

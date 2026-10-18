@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
 )
 
 // TreeReader reads tree blobs by hex id (*repo.Repo implements it, also

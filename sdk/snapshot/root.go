@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/compress"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // Version is the snapshot root and tree format version ("v").

@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"slices"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/version"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/version"
 )
 
 // ManifestVersion is the component manifest format this package reads.

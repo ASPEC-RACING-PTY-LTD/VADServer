@@ -1,4 +1,4 @@
-module github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk
+module github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk
 
 go 1.26.0
 

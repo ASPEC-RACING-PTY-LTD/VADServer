@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Operation is a long-running server operation (api-v1 §1, §3). Params and

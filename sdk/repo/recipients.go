@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"io"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // Recipient is a public key that receives a wrap of every epoch (§4.1).

@@ -7,7 +7,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // ErrRecoveryRequired is returned when a change would leave the current

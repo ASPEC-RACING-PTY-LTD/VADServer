@@ -17,8 +17,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/protocol"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/protocol"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/app"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/config"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"

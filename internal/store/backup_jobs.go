@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Backup jobs, runs and issues (api-v1 §6; shapes per rev 1.0 §6).

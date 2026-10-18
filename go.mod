@@ -14,7 +14,7 @@ require (
 require github.com/klauspost/compress v1.20.3 // indirect
 
 require (
-	github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk v0.0.0-00010101000000-000000000000
+	github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk v0.0.0-00010101000000-000000000000
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -27,4 +27,4 @@ require (
 
 // Temporary until sdk/v0.1.0 is published: build against the sibling VaultDock
 // checkout. Remove this replace and require the tagged version afterwards.
-replace github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk => ./sdk
+replace github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk => ./sdk

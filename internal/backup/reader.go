@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/objstore"
 )
 

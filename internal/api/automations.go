@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pathutil"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 )
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // ErrUnmapped means a token path has no target (no override covers it and

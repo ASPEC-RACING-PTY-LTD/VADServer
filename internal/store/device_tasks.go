@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Device task statuses stored in addition to the wire statuses (api-v1 §6).

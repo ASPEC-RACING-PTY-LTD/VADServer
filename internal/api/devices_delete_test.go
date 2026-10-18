@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
 )
 
 func apiCode(t *testing.T, err error) (int, string) {

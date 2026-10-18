@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt/vdcrypttest"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt/vdcrypttest"
 )
 
 func TestParseRepoID(t *testing.T) {

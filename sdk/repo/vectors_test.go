@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt/vdcrypttest"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt/vdcrypttest"
 )
 
 // Run `go test ./repo/ -run TestVectors -update` to regenerate. Any change

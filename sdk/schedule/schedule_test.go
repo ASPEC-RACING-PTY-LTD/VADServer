@@ -7,7 +7,7 @@ import (
 	"time"
 	_ "time/tzdata" // IANA zones on hosts without system tzdata (Windows)
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func mustLoc(t *testing.T, name string) *time.Location {

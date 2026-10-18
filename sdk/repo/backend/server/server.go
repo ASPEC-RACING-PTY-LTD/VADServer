@@ -17,9 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/repo"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/repo"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Options configure a Backend. Zero values take the defaults.

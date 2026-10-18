@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // ErrLockObject is returned for an invalid sealed lock object.

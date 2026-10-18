@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/mimetypes"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pathutil"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/mimetypes"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pathutil"
 )
 
 // Event types produced by the desktop client.

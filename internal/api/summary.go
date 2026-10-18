@@ -5,7 +5,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // mountSummary registers the routes of this feature area.

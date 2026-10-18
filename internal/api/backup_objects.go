@@ -36,8 +36,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/backup"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/objstore"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"

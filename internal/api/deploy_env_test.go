@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func TestDeployEnvAPI(t *testing.T) {

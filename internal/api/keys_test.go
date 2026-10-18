@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/keys"
 )
 

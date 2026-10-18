@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 )
 

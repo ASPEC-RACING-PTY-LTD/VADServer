@@ -18,7 +18,7 @@ import (
 )
 
 // DefaultRepo is the official repository.
-const DefaultRepo = "ASPEC-RACING-PTY-LTD/VaultDock"
+const DefaultRepo = "ASPEC-RACING-PTY-LTD/vad-client"
 
 // ChecksumsAsset is the checksum file attached to every release.
 const ChecksumsAsset = "SHA256SUMS"

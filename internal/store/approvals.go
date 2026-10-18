@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // DefaultApprovalTTL is the default approval expiry (rev 1.0 §8 rule 5).

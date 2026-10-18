@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // ServerInfo is the public reply of GET /info.

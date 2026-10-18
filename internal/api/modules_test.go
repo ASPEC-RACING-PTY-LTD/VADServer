@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 func TestModulesEndpoints(t *testing.T) {

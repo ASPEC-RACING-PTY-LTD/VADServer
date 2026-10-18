@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // DeviceProfile is a row of device_profiles. Empty strings stand for the

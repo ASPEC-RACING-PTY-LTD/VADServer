@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 )
 

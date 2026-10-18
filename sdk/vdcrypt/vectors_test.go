@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt/vdcrypttest"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt/vdcrypttest"
 )
 
 // Run `go test ./vdcrypt/ -run TestVectors -update` to regenerate. Any

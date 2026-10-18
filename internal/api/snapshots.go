@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/backup"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 	"github.com/go-chi/chi/v5"

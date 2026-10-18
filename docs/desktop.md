@@ -38,7 +38,7 @@ Uninstalling asks whether to remove these; your own files and everything on the 
 
 ## Updates
 
-The app keeps itself up to date from the GitHub releases of `ASPEC-RACING-PTY-LTD/VaultDock` (override at build time with `-X main.UpdateRepo=owner/name`; an empty value disables updates).
+The app keeps itself up to date from the GitHub releases of `ASPEC-RACING-PTY-LTD/vad-client` (override at build time with `-X main.UpdateRepo=owner/name`; an empty value disables updates).
 
 - It checks two minutes after start and then every six hours. **Settings → Updates → Check now** checks immediately.
 - A newer installer is downloaded only over HTTPS from `github.com` (redirects are limited to GitHub's asset hosts), into `%LOCALAPPDATA%\VaultDock\updates`.
@@ -50,7 +50,7 @@ Development builds (version `dev`) never update themselves.
 
 ## Publishing a release
 
-The desktop app is released from the `ASPEC-RACING-PTY-LTD/VaultDock` repository: push a version tag there and its **Release** workflow builds the Windows installer and publishes the GitHub release with `SHA256SUMS`. The server is released from this repository (`ASPEC-RACING-PTY-LTD/vad-server`) the same way; its Release workflow publishes the multi-architecture image and the deploy assets:
+The desktop app is released from the `ASPEC-RACING-PTY-LTD/vad-client` repository: push a version tag there and its **Release** workflow builds the Windows installer and publishes the GitHub release with `SHA256SUMS`. The server is released from this repository (`ASPEC-RACING-PTY-LTD/vad-server`) the same way; its Release workflow publishes the multi-architecture image and the deploy assets:
 
 ```bash
 ch tag v1.2.0

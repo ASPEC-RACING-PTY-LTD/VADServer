@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Schedule is BackupJob.schedule. It has the same fields and JSON form as

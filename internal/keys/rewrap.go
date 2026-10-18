@@ -12,7 +12,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // ErrMetaBundle is returned when a full bundle is needed but the escrow key

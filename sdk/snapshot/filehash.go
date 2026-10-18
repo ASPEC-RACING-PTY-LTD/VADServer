@@ -7,7 +7,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // NewFileHash returns the streaming keyed whole-file hash of §8.2:

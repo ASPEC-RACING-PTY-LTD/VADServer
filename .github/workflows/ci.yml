@@ -13,20 +13,20 @@ concurrency:
 permissions:
   contents: read
 
-# The shared SDK (github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk) is vendored
+# The shared SDK (github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk) is vendored
 # in ./sdk (replace => ./sdk), so no sibling checkout is needed. The steps
 # below only apply if go.mod is switched back to `replace => ../VaultDock/sdk`.
 # While
 # that replace is in go.mod, jobs that compile Go check out the VaultDock
 # repository next to this one:
 #   $GITHUB_WORKSPACE/vad-server   this repository
-#   $GITHUB_WORKSPACE/VaultDock    ASPEC-RACING-PTY-LTD/VaultDock (sdk/ only)
+#   $GITHUB_WORKSPACE/VaultDock    ASPEC-RACING-PTY-LTD/vad-client (sdk/ only)
 # Once the replace is removed, the sibling checkout is skipped and the SDK
 # comes from the Go module proxy.
 #   vars.VAULTDOCK_SDK_REF     branch, tag or SHA of VaultDock to use (default main)
 #   secrets.VAULTDOCK_SDK_TOKEN read token for VaultDock if it is private
 env:
-  SDK_MODULE: github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk
+  SDK_MODULE: github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk
 
 # All jobs run in parallel; each restores its own dependency caches.
 jobs:
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v5
         if: steps.sdk.outputs.local == 'true'
         with:
-          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          repository: ASPEC-RACING-PTY-LTD/vad-client
           ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
           token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
           path: VaultDock
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/checkout@v5
         if: steps.sdk.outputs.local == 'true'
         with:
-          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          repository: ASPEC-RACING-PTY-LTD/vad-client
           ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
           token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
           path: VaultDock
@@ -216,7 +216,7 @@ jobs:
       - uses: actions/checkout@v5
         if: steps.sdk.outputs.local == 'true'
         with:
-          repository: ASPEC-RACING-PTY-LTD/VaultDock
+          repository: ASPEC-RACING-PTY-LTD/vad-client
           ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
           token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
           path: VaultDock

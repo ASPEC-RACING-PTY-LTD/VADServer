@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // ReportProfiles sends the agent's full Windows profile and consent state

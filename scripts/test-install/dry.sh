@@ -135,7 +135,7 @@ VAULTDOCK_TRUSTED_PROXIES=172.16.0.0/12
 COMPOSE_PROFILES=caddy
 VAULTDOCK_DOMAIN=vault.example.com
 VAULTDOCK_SETUP_TOKEN=legacy-token
-VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/VaultDock
+VAULTDOCK_UPDATE_REPO=ASPEC-RACING-PTY-LTD/vad-client
 VAULTDOCK_IMAGE=ghcr.io/aspec-racing-pty-ltd/vaultdock:1.0.0
 VAULTDOCK_VERSION=1.0.0
 EOF
@@ -154,7 +154,7 @@ sc_legacy_caddy() {
 	check "unmodified legacy Caddyfile moved to the integration, no .new" sh -c "cmp -s '$ROOT/deploy/integrations/caddy/Caddyfile' '$APP/deploy/integrations/caddy/Caddyfile' && [ ! -e '$APP/deploy/integrations/caddy/Caddyfile.new' ]"
 	check "COMPOSE_PROFILES kept without approval (--yes)" env_has COMPOSE_PROFILES
 	check "existing values kept" [ "$(envval VAULTDOCK_SETUP_TOKEN)" = legacy-token ]
-	check "VAULTDOCK_UPDATE_REPO not changed silently" [ "$(envval VAULTDOCK_UPDATE_REPO)" = ASPEC-RACING-PTY-LTD/VaultDock ]
+	check "VAULTDOCK_UPDATE_REPO not changed silently" [ "$(envval VAULTDOCK_UPDATE_REPO)" = ASPEC-RACING-PTY-LTD/vad-client ]
 	check "previous image recorded for rollback is untouched" [ "$(envval VAULTDOCK_IMAGE)" = ghcr.io/aspec-racing-pty-ltd/vaultdock:1.0.0 ]
 
 	load legacy-mod

@@ -15,7 +15,7 @@
 #   VAULTDOCK_DIR      installation directory (default: $HOME/VaultDock)
 #   VAULTDOCK_REPO     GitHub "owner/name" to download from
 #                      (default ASPEC-RACING-PTY-LTD/vad-server; the server was
-#                      published from ASPEC-RACING-PTY-LTD/VaultDock before)
+#                      published from ASPEC-RACING-PTY-LTD/vad-client before)
 #   VAULTDOCK_REF      branch or tag to install (default: the latest release,
 #                      or main when no release has been published)
 #   VAULTDOCK_SOURCE   use this local source directory instead of downloading

@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // Summary returns the dashboard counters of GET /summary (api-v1 §3) for

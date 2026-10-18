@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/automation"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/client"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/protocol"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/automation"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/client"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/protocol"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/api"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/config"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/storage"

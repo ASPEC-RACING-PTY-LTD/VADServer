@@ -13,7 +13,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // Name is the config identifier of this chunker.

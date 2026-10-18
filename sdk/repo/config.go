@@ -9,10 +9,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/chunker"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/pack"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/snapshot"
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/vdcrypt"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/chunker"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/pack"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/snapshot"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
 )
 
 // Config constants (§5).

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/wire"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 // MaxTaskWait is the longest long-poll the server accepts (api-v1 §6).

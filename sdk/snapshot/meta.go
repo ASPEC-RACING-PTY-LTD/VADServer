@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk/compress"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
 )
 
 // Meta blob schemas (blob type 2, §8.3).

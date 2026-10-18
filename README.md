@@ -42,7 +42,7 @@ Non-interactive use: `VAULTDOCK_YES=1 bash install.sh install` (defaults are use
 
 ## Windows desktop app
 
-The Windows app lives in its own repository, [ASPEC-RACING-PTY-LTD/VaultDock](https://github.com/ASPEC-RACING-PTY-LTD/VaultDock). Download `VaultDock-<version>-amd64-setup.exe` from its releases (or see [docs/desktop.md](docs/desktop.md)). Installing needs administrator rights once and offers two modes: **Simple Folder Backups** and **Full Access (Advanced)**.
+The Windows app lives in its own repository, [ASPEC-RACING-PTY-LTD/vad-client](https://github.com/ASPEC-RACING-PTY-LTD/vad-client). Download `VaultDock-<version>-amd64-setup.exe` from its releases (or see [docs/desktop.md](docs/desktop.md)). Installing needs administrator rights once and offers two modes: **Simple Folder Backups** and **Full Access (Advanced)**.
 
 1. Enter your server URL, username and password.
 2. The app shows a verification code. In the web interface open **Devices**, check the code, and approve.
@@ -54,7 +54,7 @@ Backups are encrypted on the PC before upload. By default the server also holds 
 
 ## Updates
 
-- **Desktop app**: updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/VaultDock`. Installers are verified against their published SHA-256 checksum and installed while nothing is syncing.
+- **Desktop app**: updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/vad-client`. Installers are verified against their published SHA-256 checksum and installed while nothing is syncing.
 - **Server**: the admin console shows new releases. Upgrade with `~/VaultDock/app/install.sh upgrade`, or turn on nightly updates with `~/VaultDock/app/install.sh auto-update on`. Every upgrade backs up first and rolls back automatically if the new version is unhealthy.
 - **Releases**: push a `vX.Y.Z` tag and the Release workflow publishes the multi-architecture image `ghcr.io/aspec-racing-pty-ltd/vad-server:<version>` and a GitHub release with `install.sh`, `docker-compose.yml`, `env.example`, `deploy.tar.gz` and `SHA256SUMS`. The Windows installer is released from the `VaultDock` repository.
 
@@ -84,7 +84,7 @@ install.sh           installer / upgrader / uninstaller
 Dockerfile, docker-compose.yml
 ```
 
-Shared code (automation engine, API client, request signing, backup format) is the Go module `github.com/ASPEC-RACING-PTY-LTD/VaultDock/sdk` from the `VaultDock` repository. A copy lives in `sdk/` so this repository builds on its own; after changing the SDK in VaultDock, run `scripts/sync-sdk.sh` and commit.
+Shared code (automation engine, API client, request signing, backup format) is the Go module `github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk` from the `VaultDock` repository. A copy lives in `sdk/` so this repository builds on its own; after changing the SDK in VaultDock, run `scripts/sync-sdk.sh` and commit.
 
 ## Licence
 
