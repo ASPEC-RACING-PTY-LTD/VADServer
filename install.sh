@@ -353,7 +353,7 @@ build_image() {
 # arrays inside an entry). Keep both files in that form.
 
 # Variables install.sh may update in place (must match "managed": true).
-MANAGED_KEYS="VAULTDOCK_ENV_FILE VAULTDOCK_IMAGE VAULTDOCK_VERSION VAULTDOCK_AUTO_UPDATE VAULTDOCK_INTEGRATIONS VAULTDOCK_TUNNEL_NETWORK"
+MANAGED_KEYS="COMPOSE_PROJECT_NAME VAULTDOCK_ENV_FILE VAULTDOCK_IMAGE VAULTDOCK_VERSION VAULTDOCK_AUTO_UPDATE VAULTDOCK_INTEGRATIONS VAULTDOCK_TUNNEL_NETWORK"
 ENV_SCHEMA_REL="deploy/env.schema.json"
 MANAGED_FILES_REL="deploy/managed-files.json"
 ENV_APPROVALS_REL="deploy/env-approvals"
@@ -564,6 +564,26 @@ kek_ensure() {
 	rm -f -- "$DIR/$KEK_MARK_REL"
 	KEK_CREATED=1
 	ok "Created the server key file $f (32 random bytes, mode 0600; it is never shown)."
+}
+
+# link_source_env makes "docker compose" work in the source checkout the
+# installer ran from (e.g. ~/vad-server): its .env becomes a link to the real
+# configuration ($ENV_FILE), and COMPOSE_PROJECT_NAME pins the project, so
+# compose commands there control the running installation, not a second one.
+link_source_env() {
+	[ -f "$ENV_FILE" ] || return 0
+	env_set_managed COMPOSE_PROJECT_NAME "$PROJECT"
+	local src; src=$(local_source)
+	[ -n "$src" ] || return 0
+	local src_real app_real
+	src_real=$(cd -- "$src" && pwd -P); app_real=$(cd -- "$APP" && pwd -P)
+	[ "$src_real" != "$app_real" ] || return 0
+	if [ -e "$src/.env" ] && [ ! -L "$src/.env" ]; then
+		warn "$src/.env is a separate file; docker compose in $src uses it, not $ENV_FILE. Remove it to link the installed configuration."
+		return 0
+	fi
+	ln -sfn -- "$ENV_FILE" "$src/.env"
+	info "Linked $src/.env to $ENV_FILE; docker compose works in either folder."
 }
 
 # kek_backup_prompt asks the administrator to copy the KEK off the server,
@@ -1339,6 +1359,7 @@ do_install() {
 	compose up -d
 	wait_healthy || die "Installation finished but VaultDock is not healthy. Fix the problem above, then run: $0 upgrade"
 	print_summary
+	link_source_env
 	kek_backup_prompt
 	if [ "$(env_get VAULTDOCK_BIND)" = 127.0.0.1 ] && ! integration_enabled caddy && [ "$YES" != 1 ] && have_tty &&
 		confirm "Look for an existing Cloudflare Tunnel (cloudflared) on this server and connect it now?" y; then
@@ -1466,6 +1487,7 @@ do_upgrade() {
 	if compose up -d --remove-orphans && wait_healthy; then
 		rm -rf -- "$APP.old"
 		ok "Upgrade complete. Backup kept at $bk"
+		link_source_env
 		if [ -n "$MODIFIED_FILES" ]; then warn "Locally modified files:$MODIFIED_FILES (see the .new/.local copies in $APP)."; fi
 		kek_backup_prompt
 		return
