@@ -5,6 +5,7 @@ import { del, errorMessage, get, patch, post } from '../../../lib/api'
 import { Button, ErrorState, Field, Modal, PageLoader, Toggle, useUI } from '../../../components/ui'
 import { LocationBar } from '../LocationBar'
 import { GB } from './QuotaInput'
+import { StorageCompression } from './StorageCompression'
 
 export default function StorageTab() {
   const qc = useQueryClient()
@@ -29,6 +30,7 @@ export default function StorageTab() {
   }
   return (
     <div>
+      <StorageCompression />
       <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600 sm:flex-row sm:items-center dark:bg-slate-900 dark:text-slate-300">
         <span className="flex-1">
           Storage locations are directories on HDDs, SSDs or mounted volumes. New locations must be inside the allowed roots: <code className="font-mono text-xs">{(data.allowed_roots ?? []).join(', ') || 'any path'}</code>. With Docker, mount the disk into the container under one of these roots first.
