@@ -86,7 +86,9 @@ func TestCompressStoredOpenSweepRemove(t *testing.T) {
 	}
 
 	// Deleting the blob removes every variant.
-	_, _ = f.m.Open(f.loc.ID, f.usr.ID, textSum)
+	if fh, err := f.m.Open(f.loc.ID, f.usr.ID, textSum); err == nil {
+		fh.Close()
+	}
 	if _, err := f.st.DB.ExecContext(ctx, "DELETE FROM nodes"); err != nil {
 		t.Fatal(err)
 	}
