@@ -271,6 +271,40 @@ func (s *Store) PruneActivity(ctx context.Context, olderThan int64) {
 	_, _ = s.DB.ExecContext(ctx, "DELETE FROM notifications WHERE created_at < ?", olderThan)
 }
 
+// HistoryCleared counts what ClearHistory removed.
+type HistoryCleared struct {
+	Transfers     int64 `json:"transfers"`
+	Activity      int64 `json:"activity"`
+	Notifications int64 `json:"notifications"`
+}
+
+// ClearHistory removes all finished transfers, non-audit activity and
+// notifications (a fresh start after a move or a reset). Active transfers,
+// audit entries and stored files are kept.
+func (s *Store) ClearHistory(ctx context.Context) (HistoryCleared, error) {
+	var out HistoryCleared
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback()
+	for _, q := range []struct {
+		sql string
+		n   *int64
+	}{
+		{"DELETE FROM transfers WHERE status != 'active'", &out.Transfers},
+		{"DELETE FROM activity WHERE audit = 0", &out.Activity},
+		{"DELETE FROM notifications", &out.Notifications},
+	} {
+		res, err := tx.ExecContext(ctx, q.sql)
+		if err != nil {
+			return out, err
+		}
+		*q.n, _ = res.RowsAffected()
+	}
+	return out, tx.Commit()
+}
+
 // --- notifications ---
 
 type Notification struct {

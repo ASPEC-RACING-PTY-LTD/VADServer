@@ -874,6 +874,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 					r.Delete("/admin/storage/{id}", s.handleAdminDeleteStorage)
 					r.Get("/admin/storage/compression", s.handleStorageCompression)
 					r.Post("/admin/storage/compression/run", s.handleStorageCompressionRun)
+					r.Post("/admin/history/clear", s.handleAdminClearHistory)
 					r.Get("/admin/devices", s.handleAdminDevices)
 					r.Post("/admin/devices/{id}/revoke", s.handleAdminDeviceRevoke)
 					r.Get("/admin/transfers", s.handleAdminTransfers)

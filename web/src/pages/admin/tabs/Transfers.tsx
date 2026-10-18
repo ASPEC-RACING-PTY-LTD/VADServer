@@ -1,15 +1,34 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, XCircle } from 'lucide-react'
-import { del, errorMessage, get } from '../../../lib/api'
+import { CheckCircle2, Eraser, XCircle } from 'lucide-react'
+import { del, errorMessage, get, post } from '../../../lib/api'
 import { formatBytes, timeAgo } from '../../../lib/format'
-import { EmptyState, ErrorState, IconButton, PageLoader, ProgressBar, Tabs, useUI } from '../../../components/ui'
+import { Button, EmptyState, ErrorState, IconButton, PageLoader, ProgressBar, Tabs, useUI } from '../../../components/ui'
 import { TransfersTable } from '../../../components/TransfersTable'
 
 export default function TransfersTab() {
   const [tab, setTab] = useState<'active' | 'failed' | ''>('active')
   const qc = useQueryClient()
-  const { toast } = useUI()
+  const { toast, confirm } = useUI()
+  const [clearing, setClearing] = useState(false)
+  const clearHistory = async () => {
+    const ok = await confirm({
+      title: 'Clear history?',
+      message: 'Removes all finished and failed transfers, the activity feed and notifications, so counters like "uploaded" start from zero. Active uploads, stored files, devices and audit entries are kept.',
+      confirmLabel: 'Clear history',
+    })
+    if (!ok) return
+    setClearing(true)
+    try {
+      const n = await post<{ transfers: number; activity: number; notifications: number }>('/admin/history/clear')
+      toast('success', `Cleared ${n.transfers} transfers, ${n.activity} activity entries and ${n.notifications} notifications`)
+      await qc.invalidateQueries()
+    } catch (e) {
+      toast('error', errorMessage(e))
+    } finally {
+      setClearing(false)
+    }
+  }
   const uploads = useQuery({ queryKey: ['admin-uploads'], queryFn: () => get('/admin/uploads'), refetchInterval: 5000, enabled: tab === 'active' })
   return (
     <div className="card overflow-hidden">
@@ -23,6 +42,9 @@ export default function TransfersTab() {
             { id: '', label: 'All transfers' },
           ]}
         />
+        <Button size="sm" variant="danger" icon={<Eraser className="size-4" />} loading={clearing} onClick={clearHistory}>
+          Clear history
+        </Button>
       </div>
       {tab === 'active' ? (
         uploads.isLoading ? (
