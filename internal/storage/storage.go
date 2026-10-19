@@ -644,14 +644,18 @@ func (m *Manager) CleanOrphans(ctx context.Context, minAge time.Duration) (int, 
 			if err != nil || info.ModTime().After(cutoff) {
 				continue
 			}
-			id := name
-			if ext := filepath.Ext(name); ext == ".part" {
-				id = name[:len(name)-len(ext)]
+			id := strings.TrimSuffix(name, framesSuffix)
+			if ext := filepath.Ext(id); ext == ".part" {
+				id = id[:len(id)-len(ext)]
 			}
 			if u, err := m.st.UploadAny(ctx, id); err == nil && (u.Status == "open" || u.Status == "finalizing") {
 				continue
 			}
-			if os.Remove(filepath.Join(tmpDir, name)) == nil {
+			rm := os.Remove
+			if e.IsDir() && strings.HasSuffix(name, framesSuffix) {
+				rm = os.RemoveAll // kept compressed chunks of an upload
+			}
+			if rm(filepath.Join(tmpDir, name)) == nil {
 				removed++
 			}
 		}

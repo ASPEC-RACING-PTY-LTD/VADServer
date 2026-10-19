@@ -1050,4 +1050,10 @@ CREATE INDEX node_jobs_queue ON node_jobs(node_id, status, id);
 	`
 ALTER TABLE users ADD COLUMN failures_dismissed_id INTEGER NOT NULL DEFAULT 0;
 `,
+	// 12: uploads the client compressed itself; admin reset of a device's
+	// direct (LAN) upload setting
+	`
+ALTER TABLE uploads ADD COLUMN client_compressed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE devices ADD COLUMN direct_reset_gen INTEGER NOT NULL DEFAULT 0;
+`,
 }

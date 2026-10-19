@@ -797,7 +797,7 @@ func (s *Server) RunMaintenance(ctx context.Context, orphans bool) map[string]an
 			default:
 				_ = s.st.DeleteUpload(ctx, u.ID)
 				if tmp, err := s.blobs.TempPath(u.LocationID, u.ID); err == nil {
-					_ = os.Remove(tmp)
+					storage.RemoveTemp(tmp)
 				}
 			}
 			cleaned++

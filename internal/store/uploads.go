@@ -29,8 +29,11 @@ type Upload struct {
 	CreatedAt     int64    `json:"created_at"`
 	UpdatedAt     int64    `json:"updated_at"`
 	ExpiresAt     int64    `json:"expires_at"`
-	Username      string   `json:"username,omitempty"`
-	DeviceName    string   `json:"device_name,omitempty"`
+	// ClientCompressed: the client sends chunks compressed where that saves
+	// bytes, so chunks that arrive raw did not compress.
+	ClientCompressed bool   `json:"client_compressed"`
+	Username         string `json:"username,omitempty"`
+	DeviceName       string `json:"device_name,omitempty"`
 }
 
 // ReceivedChunks returns the indices of received chunks.
@@ -63,14 +66,14 @@ func (u *Upload) ChunkLen(i int64) int64 {
 	return min(u.ChunkSize, u.Size-start)
 }
 
-const uploadCols = `u.id, u.user_id, u.device_id, COALESCE(u.transfer_id,0), u.path, u.size, u.sha256, u.chunk_size, u.chunks_total, u.received, u.bytes_received, u.location_id, u.modified_at, u.tags, u.on_conflict, u.status, u.created_at, u.updated_at, u.expires_at, COALESCE(us.username,''), COALESCE(d.name,'')`
+const uploadCols = `u.id, u.user_id, u.device_id, COALESCE(u.transfer_id,0), u.path, u.size, u.sha256, u.chunk_size, u.chunks_total, u.received, u.bytes_received, u.location_id, u.modified_at, u.tags, u.on_conflict, u.status, u.created_at, u.updated_at, u.expires_at, u.client_compressed, COALESCE(us.username,''), COALESCE(d.name,'')`
 const uploadFrom = ` FROM uploads u LEFT JOIN users us ON us.id = u.user_id LEFT JOIN devices d ON d.id = u.device_id`
 
 func scanUpload(sc interface{ Scan(...any) error }) (*Upload, error) {
 	var u Upload
 	var dev sql.NullInt64
 	var tags string
-	err := sc.Scan(&u.ID, &u.UserID, &dev, &u.TransferID, &u.Path, &u.Size, &u.SHA256, &u.ChunkSize, &u.ChunksTotal, &u.Received, &u.BytesReceived, &u.LocationID, &u.ModifiedAt, &tags, &u.OnConflict, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.Username, &u.DeviceName)
+	err := sc.Scan(&u.ID, &u.UserID, &dev, &u.TransferID, &u.Path, &u.Size, &u.SHA256, &u.ChunkSize, &u.ChunksTotal, &u.Received, &u.BytesReceived, &u.LocationID, &u.ModifiedAt, &tags, &u.OnConflict, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.ClientCompressed, &u.Username, &u.DeviceName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -95,9 +98,9 @@ func (s *Store) CreateUpload(ctx context.Context, u *Upload) error {
 			return err
 		}
 		u.TransferID, _ = res.LastInsertId()
-		_, err = tx.ExecContext(ctx, `INSERT INTO uploads(id, user_id, device_id, transfer_id, path, size, sha256, chunk_size, chunks_total, received, location_id, modified_at, tags, on_conflict, status, created_at, updated_at, expires_at)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'open',?,?,?)`,
-			u.ID, u.UserID, u.DeviceID, u.TransferID, u.Path, u.Size, u.SHA256, u.ChunkSize, u.ChunksTotal, u.Received, u.LocationID, u.ModifiedAt, string(tags), u.OnConflict, u.CreatedAt, u.UpdatedAt, u.ExpiresAt)
+		_, err = tx.ExecContext(ctx, `INSERT INTO uploads(id, user_id, device_id, transfer_id, path, size, sha256, chunk_size, chunks_total, received, location_id, modified_at, tags, on_conflict, status, created_at, updated_at, expires_at, client_compressed)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'open',?,?,?,?)`,
+			u.ID, u.UserID, u.DeviceID, u.TransferID, u.Path, u.Size, u.SHA256, u.ChunkSize, u.ChunksTotal, u.Received, u.LocationID, u.ModifiedAt, string(tags), u.OnConflict, u.CreatedAt, u.UpdatedAt, u.ExpiresAt, u.ClientCompressed)
 		return err
 	})
 }

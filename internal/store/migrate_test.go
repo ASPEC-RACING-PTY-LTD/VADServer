@@ -56,8 +56,8 @@ func assertSchema(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 11 || LatestSchemaVersion() != 11 {
-		t.Fatalf("schema version = %d, latest = %d, want 11", v, LatestSchemaVersion())
+	if v != 12 || LatestSchemaVersion() != 12 {
+		t.Fatalf("schema version = %d, latest = %d, want 12", v, LatestSchemaVersion())
 	}
 	for _, tbl := range newTables {
 		var n int

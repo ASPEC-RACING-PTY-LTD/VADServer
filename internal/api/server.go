@@ -649,7 +649,7 @@ var knownFeatures = []string{
 	wire.FeatureBackup, wire.FeatureEscrow, wire.FeatureDeviceTasks, wire.FeatureApprovals,
 	wire.FeatureVersions, wire.FeatureSyncTwoWay, wire.FeatureProfiles, wire.FeatureModules,
 	wire.FeatureDestinations, wire.FeatureAI, wire.FeatureDeployEnv, wire.FeatureRestore,
-	wire.FeatureUploadZstd,
+	wire.FeatureUploadZstd, wire.FeatureUploadCompressedFlag, wire.FeatureDirectUpload,
 }
 
 var (
@@ -848,6 +848,8 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 				r.Get("/device/automations", s.handleDeviceAutomations)
 				r.Post("/device/transfers", s.handleDeviceTransfers)
 				r.Post("/device/notifications", s.handleDeviceNotifications)
+				r.Post("/devices/direct-probe", s.handleDirectProbeStart)
+				r.Get("/devices/direct-probe/{nonce}", s.handleDirectProbeAnswer)
 			})
 
 			rt.Sess = r.Group(func(r chi.Router) {
@@ -903,6 +905,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 					r.Post("/admin/history/clear", s.handleAdminClearHistory)
 					r.Get("/admin/devices", s.handleAdminDevices)
 					r.Post("/admin/devices/{id}/revoke", s.handleAdminDeviceRevoke)
+					r.Post("/admin/devices/{id}/direct-reset", s.handleAdminDirectReset)
 					r.Get("/admin/transfers", s.handleAdminTransfers)
 					r.Get("/admin/uploads", s.handleAdminUploads)
 					r.Delete("/admin/uploads/{id}", s.handleAdminCancelUpload)

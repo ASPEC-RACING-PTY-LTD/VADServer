@@ -69,6 +69,13 @@ const (
 	// FeatureUploadZstd: upload chunks may be sent with
 	// "Content-Encoding: zstd"; X-Chunk-SHA256 stays the hash of the raw chunk.
 	FeatureUploadZstd = "upload.zstd"
+	// FeatureUploadCompressedFlag: an upload request may carry
+	// "compressed": true (the client compresses chunks where that saves
+	// bytes); the server then stores the client's frames as they are.
+	FeatureUploadCompressedFlag = "upload.compressed_flag"
+	// FeatureDirectUpload: a device may verify a direct (LAN) address of the
+	// server with POST /devices/direct-probe and send its uploads there.
+	FeatureDirectUpload = "upload.direct"
 )
 
 // List limits for ?cursor=&limit= (api-v1 §1).

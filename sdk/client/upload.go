@@ -25,6 +25,10 @@ type UploadRequest struct {
 	ModifiedAt int64    `json:"modified_at"`
 	Tags       []string `json:"tags,omitempty"`
 	OnConflict string   `json:"on_conflict,omitempty"`
+	// Compressed tells the server the chunks are sent compressed where that
+	// saves bytes (wire.FeatureUploadCompressedFlag); set it only for servers
+	// that advertise the flag.
+	Compressed bool `json:"compressed,omitempty"`
 }
 
 type UploadSession struct {

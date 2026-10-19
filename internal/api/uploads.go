@@ -36,6 +36,10 @@ type uploadReq struct {
 	ModifiedAt int64    `json:"modified_at"`
 	Tags       []string `json:"tags"`
 	OnConflict string   `json:"on_conflict"`
+	// Compressed (upload.compressed_flag): the client sends chunks
+	// compressed where that saves bytes, so the server keeps its frames and
+	// does not try again the chunks that arrive raw.
+	Compressed bool `json:"compressed"`
 }
 
 type uploadView struct {
@@ -227,6 +231,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		ID: auth.RandomToken(18), UserID: u.ID, DeviceID: p.deviceID(), Path: fullPath, Size: req.Size, SHA256: req.SHA256,
 		ChunkSize: chunk, ChunksTotal: total, LocationID: locID, ModifiedAt: req.ModifiedAt, Tags: req.Tags, OnConflict: req.OnConflict,
 		Status: "open", CreatedAt: now.UnixMilli(), UpdatedAt: now.UnixMilli(), ExpiresAt: now.Add(s.cfg.UploadSessionTTL).UnixMilli(),
+		ClientCompressed: req.Compressed,
 	}
 	tmp, err := s.blobs.TempPath(locID, up.ID)
 	if err != nil {
@@ -398,8 +403,25 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	ow := io.NewOffsetWriter(f, idx*up.ChunkSize)
 	var body io.Reader = r.Body
 	var wire hashReader
+	// With storage compression on, a compressed chunk's frame is kept so the
+	// stored file reuses it instead of being compressed again.
+	var frame *storage.FrameWriter
+	if zipped && s.settings.Get().StorageCompression {
+		if frame, err = storage.NewFrameWriter(tmp, idx); err != nil {
+			slog.Warn("cannot keep compressed chunk", "upload", up.ID, "err", err)
+			frame = nil
+		} else {
+			defer frame.Discard() // no-op after Keep
+		}
+	} else {
+		storage.DropFrame(tmp, idx) // a raw retry of a chunk sent compressed before
+	}
 	if zipped {
-		wire = hashReader{r: io.LimitReader(r.Body, r.ContentLength), h: sha256.New()}
+		var in io.Reader = io.LimitReader(r.Body, r.ContentLength)
+		if frame != nil {
+			in = io.TeeReader(in, frame)
+		}
+		wire = hashReader{r: in, h: sha256.New()}
 		zr, err := compress.NewFrameReader(&wire)
 		if err != nil {
 			writeErr(w, r, errf(400, "bad_encoding", "Invalid compressed chunk"))
@@ -418,10 +440,10 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 		// even if verification then fails.
 		got, err = receiveChunk(ow, body, idx, want, declared)
 	}
-	if err == nil && zipped && bodySHA != "" {
+	if err == nil && zipped && (bodySHA != "" || frame != nil) {
 		// The rest of the frame (end marks) is part of the signed bytes.
 		_, _ = io.Copy(io.Discard, &wire)
-		if hex.EncodeToString(wire.h.Sum(nil)) != bodySHA {
+		if bodySHA != "" && hex.EncodeToString(wire.h.Sum(nil)) != bodySHA {
 			err = errf(422, "chunk_hash_mismatch", "Chunk %d was corrupted in transit; retry", idx)
 		}
 	}
@@ -432,6 +454,11 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	if err := f.Sync(); err != nil {
 		writeErr(w, r, fmt.Errorf("sync chunk: %w", err))
 		return
+	}
+	if frame != nil {
+		if kerr := frame.Keep(); kerr != nil {
+			slog.Warn("cannot keep compressed chunk", "upload", up.ID, "err", kerr)
+		}
 	}
 	if _, err := s.st.MarkChunk(r.Context(), up.UserID, up.ID, idx, want, time.Now().Add(s.cfg.UploadSessionTTL).UnixMilli()); err != nil {
 		if errors.Is(err, store.ErrConflict) {
@@ -728,7 +755,7 @@ func (s *Server) startFinalize(r *http.Request, p *Principal, up *store.Upload) 
 				_, _ = s.st.SetUploadStatus(ctx, up.ID, "finalizing", "failed")
 				_ = s.st.FinishTransfer(ctx, nil, up.TransferID, "failed", errMessage(err), -1)
 				if tmp, terr := s.blobs.TempPath(up.LocationID, up.ID); terr == nil {
-					_ = os.Remove(tmp)
+					storage.RemoveTemp(tmp)
 				}
 			} else {
 				_, _ = s.st.SetUploadStatus(ctx, up.ID, "finalizing", "open")
@@ -736,6 +763,7 @@ func (s *Server) startFinalize(r *http.Request, p *Principal, up *store.Upload) 
 			}
 		} else {
 			s.blobs.Remove(ctx, res.Freed)
+			s.compressUploaded(up)
 			if res.Result != "unchanged" && res.Result != "skipped" {
 				logUploaded(res.Node.Path, humanBytes(up.Size)+" "+res.Result)
 			}
@@ -829,6 +857,16 @@ func (s *Server) handleUploadCancel(w http.ResponseWriter, r *http.Request) {
 	if up == nil {
 		return
 	}
+	// ?restart=1: the client starts this file over (for example on another
+	// route); the session goes without a cancelled transfer in the history.
+	if r.URL.Query().Get("restart") == "1" {
+		if s.dropUpload(r.Context(), up) || finalizeJobFor(up.ID) == nil {
+			writeJSON(w, 200, map[string]any{"ok": true})
+			return
+		}
+		writeErr(w, r, errf(409, "upload_busy", "Upload is being finalised and cannot be cancelled"))
+		return
+	}
 	if !s.cancelUpload(r.Context(), up, "cancelled by user") {
 		if cur, err := s.st.Upload(r.Context(), up.UserID, up.ID); err == nil && cur.Status == "finalizing" {
 			writeErr(w, r, errf(409, "upload_busy", "Upload is being finalised and cannot be cancelled"))
@@ -852,7 +890,7 @@ func (s *Server) cancelUpload(ctx context.Context, up *store.Upload, reason stri
 		return false
 	}
 	if tmp, err := s.blobs.TempPath(up.LocationID, up.ID); err == nil {
-		_ = os.Remove(tmp)
+		storage.RemoveTemp(tmp)
 	}
 	if up.Status == "open" || up.Status == "finalizing" {
 		_ = s.st.FinishTransfer(ctx, nil, up.TransferID, "cancelled", reason, -1)
@@ -888,22 +926,31 @@ func (s *Server) discardUpload(ctx context.Context, up *store.Upload) {
 	if finalizeRecent(up.ID) {
 		return // its data was just moved into the blob store, not lost
 	}
+	if s.dropUpload(ctx, up) {
+		slog.Info("upload data missing; session discarded", "upload", up.ID, "path", up.Path)
+	}
+}
+
+// dropUpload deletes a session that is not being finished, with its temp
+// file and transfer record, as if it never existed. It reports whether it
+// was deleted.
+func (s *Server) dropUpload(ctx context.Context, up *store.Upload) bool {
 	ctx = context.WithoutCancel(ctx)
 	unlock, err := uploadLocks.acquire(ctx, up.ID, true)
 	if err != nil {
-		return
+		return false
 	}
 	defer unlock()
 	if deleted, err := s.st.DeleteUploadUnlessFinalizing(ctx, up.ID); err != nil || !deleted {
-		return
+		return false
 	}
 	if tmp, err := s.blobs.TempPath(up.LocationID, up.ID); err == nil {
-		_ = os.Remove(tmp)
+		storage.RemoveTemp(tmp)
 	}
 	if up.TransferID > 0 {
 		_ = s.st.DeleteTransfer(ctx, up.TransferID)
 	}
-	slog.Info("upload data missing; session discarded", "upload", up.ID, "path", up.Path)
+	return true
 }
 
 func humanBytes(n int64) string {

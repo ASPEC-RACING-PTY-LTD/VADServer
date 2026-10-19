@@ -86,7 +86,13 @@ type Client struct {
 	// ChunkBody optionally wraps chunk upload bodies (progress counting,
 	// bandwidth limiting).
 	ChunkBody func(io.Reader) io.Reader
+	// direct is the verified local route for upload traffic (direct.go).
+	direct       atomic.Pointer[directRoute]
+	onDirectLost atomic.Pointer[func(error)]
 }
+
+// routeKey marks a request sent over a direct route.
+type routeKey struct{}
 
 // Options configure a client.
 type Options struct {
@@ -266,12 +272,23 @@ func (c *Client) observeServerTime(resp *http.Response, sent, recv time.Time) {
 }
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body io.Reader, bodyHash string, length int64, sign bool) (*http.Request, error) {
-	u := *c.BaseURL
+	base, d := c.routeFor(method, path)
+	if d != nil {
+		ctx = context.WithValue(ctx, routeKey{}, d)
+	}
+	return c.newRequestAt(ctx, base, method, path, body, bodyHash, length, sign)
+}
+
+// newRequestAt builds a request for path below base. The signature covers
+// the method, path and body, not the host, so it is valid at any address of
+// the server.
+func (c *Client) newRequestAt(ctx context.Context, base *url.URL, method, path string, body io.Reader, bodyHash string, length int64, sign bool) (*http.Request, error) {
+	u := *base
 	rel, err := url.Parse(path)
 	if err != nil {
 		return nil, err
 	}
-	u.Path = c.BaseURL.Path + rel.Path
+	u.Path = base.Path + rel.Path
 	u.RawQuery = rel.RawQuery
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
 	if err != nil {
@@ -299,8 +316,16 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 // responses are closed and returned as *APIError.
 func (c *Client) open(req *http.Request) (*http.Response, error) {
 	sent := time.Now()
-	resp, err := c.HTTP.Do(req)
+	hc := c.HTTP
+	d, _ := req.Context().Value(routeKey{}).(*directRoute)
+	if d != nil {
+		hc = d.http
+	}
+	resp, err := hc.Do(req)
 	if err != nil {
+		if d != nil && req.Context().Err() == nil {
+			return nil, c.lost(d, err)
+		}
 		return nil, err
 	}
 	c.observeServerTime(resp, sent, time.Now())
