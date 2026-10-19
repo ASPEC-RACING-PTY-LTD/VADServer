@@ -836,6 +836,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 				r.Get("/activity", s.handleActivity)
 				r.Get("/transfers", s.handleTransfers)
 				r.Get("/sync/overview", s.handleSyncOverview)
+				r.Post("/sync/failures/dismiss", s.handleSyncDismissFailures)
 				r.Get("/notifications", s.handleNotifications)
 				r.Post("/notifications/read", s.handleNotificationsRead)
 

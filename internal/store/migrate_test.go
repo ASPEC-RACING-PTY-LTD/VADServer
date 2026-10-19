@@ -31,7 +31,7 @@ var newTables = []string{
 // newColumns lists columns added to pre-existing tables.
 var newColumns = map[string][]string{
 	"devices":       {"can_delete"},
-	"users":         {"is_superuser", "backup_quota_bytes"},
+	"users":         {"is_superuser", "backup_quota_bytes", "failures_dismissed_id"},
 	"nodes":         {"revision"},
 	"uploads":       {"folder_id", "base_revision", "base_sha256"},
 	"automations":   {"schema_version", "runtime"},
@@ -56,8 +56,8 @@ func assertSchema(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 10 || LatestSchemaVersion() != 10 {
-		t.Fatalf("schema version = %d, latest = %d, want 10", v, LatestSchemaVersion())
+	if v != 11 || LatestSchemaVersion() != 11 {
+		t.Fatalf("schema version = %d, latest = %d, want 11", v, LatestSchemaVersion())
 	}
 	for _, tbl := range newTables {
 		var n int

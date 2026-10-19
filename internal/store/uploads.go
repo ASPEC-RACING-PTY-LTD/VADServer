@@ -276,6 +276,28 @@ func (s *Store) FinishTransfer(ctx context.Context, q Querier, id int64, status,
 	return err
 }
 
+// DeleteTransfer removes a transfer record (an upload session that was
+// discarded and restarted, so it never shows as a failure).
+func (s *Store) DeleteTransfer(ctx context.Context, id int64) error {
+	_, err := s.DB.ExecContext(ctx, "DELETE FROM transfers WHERE id = ?", id)
+	return err
+}
+
+// FailuresDismissedID returns the newest failed transfer id the user has
+// dismissed from the sync warnings.
+func (s *Store) FailuresDismissedID(ctx context.Context, userID int64) (int64, error) {
+	var id int64
+	err := s.DB.QueryRowContext(ctx, "SELECT failures_dismissed_id FROM users WHERE id = ?", userID).Scan(&id)
+	return id, err
+}
+
+// DismissFailures hides the user's current failed transfers from the sync
+// warnings; later failures show again.
+func (s *Store) DismissFailures(ctx context.Context, userID int64) error {
+	_, err := s.DB.ExecContext(ctx, "UPDATE users SET failures_dismissed_id = (SELECT COALESCE(MAX(id),0) FROM transfers WHERE user_id = ? AND status = 'failed') WHERE id = ?", userID, userID)
+	return err
+}
+
 // RecordTransfer inserts an already-finished transfer (dedup hits,
 // unchanged files, device-side failures).
 func (s *Store) RecordTransfer(ctx context.Context, t Transfer) error {
@@ -294,6 +316,7 @@ type TransferFilter struct {
 	Status   string // "", active, completed, failed, ... ; "finished" = not active
 	Limit    int
 	Before   int64
+	After    int64 // only ids above this
 }
 
 func (s *Store) ListTransfers(ctx context.Context, f TransferFilter) ([]Transfer, error) {
@@ -320,6 +343,10 @@ func (s *Store) ListTransfers(ctx context.Context, f TransferFilter) ([]Transfer
 	if f.Before > 0 {
 		where = append(where, "t.id < ?")
 		args = append(args, f.Before)
+	}
+	if f.After > 0 {
+		where = append(where, "t.id > ?")
+		args = append(args, f.After)
 	}
 	limit := f.Limit
 	if limit <= 0 || limit > 500 {

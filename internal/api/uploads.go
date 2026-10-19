@@ -185,9 +185,15 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resume an existing session for identical content and target.
+	// A session whose temp data is missing or short (lost in a move or a
+	// crash) is discarded and a fresh one started, so the client re-sends
+	// the whole file.
 	if existing, err := s.st.FindResumableUpload(r.Context(), u.ID, p.deviceID(), fullPath, req.Size, req.SHA256); err == nil {
-		writeJSON(w, 200, map[string]any{"status": "open", "resumed": true, "upload": viewUpload(existing)})
-		return
+		if s.uploadDataIntact(existing) {
+			writeJSON(w, 200, map[string]any{"status": "open", "resumed": true, "upload": viewUpload(existing)})
+			return
+		}
+		s.discardUpload(r.Context(), existing)
 	}
 
 	if u.QuotaBytes > 0 {
@@ -380,6 +386,9 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := os.OpenFile(tmp, os.O_WRONLY, 0)
 	if err != nil {
+		unlockChunk()
+		unlockUpload()
+		s.discardUpload(r.Context(), cur)
 		writeErr(w, r, errf(410, "upload_gone", "Upload data is no longer available; start a new upload"))
 		return
 	}
@@ -510,13 +519,16 @@ func (k *keyedLocks) acquire(ctx context.Context, key string, exclusive bool) (f
 	if exclusive {
 		lock, tryLock, unlock = l.Lock, l.TryLock, l.Unlock
 	}
-	release := func() {
-		unlock()
-		k.mu.Lock()
-		if l.refs--; l.refs == 0 {
-			delete(k.m, key)
-		}
-		k.mu.Unlock()
+	var once sync.Once
+	release := func() { // safe to call more than once
+		once.Do(func() {
+			unlock()
+			k.mu.Lock()
+			if l.refs--; l.refs == 0 {
+				delete(k.m, key)
+			}
+			k.mu.Unlock()
+		})
 	}
 	if tryLock() {
 		return release, nil
@@ -556,6 +568,12 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 	if !up.Complete() {
 		unlock()
 		writeJSON(w, 409, map[string]any{"error": map[string]any{"code": "incomplete", "message": "Not all chunks have been received"}, "upload": viewUpload(up)})
+		return
+	}
+	if !s.uploadDataIntact(up) {
+		unlock()
+		s.discardUpload(r.Context(), up)
+		writeErr(w, r, errf(410, "upload_gone", "Upload data is missing; start a new upload"))
 		return
 	}
 	ok, err := s.st.SetUploadStatus(r.Context(), up.ID, "open", "finalizing")
@@ -694,6 +712,49 @@ func (s *Server) cancelUpload(ctx context.Context, up *store.Upload, reason stri
 		_ = s.st.FinishTransfer(ctx, nil, up.TransferID, "cancelled", reason, -1)
 	}
 	return true
+}
+
+// uploadDataIntact reports whether an open session's temp file still holds
+// every chunk the session has recorded as received.
+func (s *Server) uploadDataIntact(up *store.Upload) bool {
+	tmp, err := s.blobs.TempPath(up.LocationID, up.ID)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(tmp)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	var end int64
+	for i := up.ChunksTotal - 1; i >= 0; i-- {
+		if up.Received[i/8]&(1<<(i%8)) != 0 {
+			end = i*up.ChunkSize + up.ChunkLen(i)
+			break
+		}
+	}
+	return info.Size() >= end
+}
+
+// discardUpload drops a session whose data was lost: the session, its temp
+// file and its transfer record go, so the next attempt registers as a new
+// transfer and the client uploads the file again in full.
+func (s *Server) discardUpload(ctx context.Context, up *store.Upload) {
+	ctx = context.WithoutCancel(ctx)
+	unlock, err := uploadLocks.acquire(ctx, up.ID, true)
+	if err != nil {
+		return
+	}
+	defer unlock()
+	if deleted, err := s.st.DeleteUploadUnlessFinalizing(ctx, up.ID); err != nil || !deleted {
+		return
+	}
+	if tmp, err := s.blobs.TempPath(up.LocationID, up.ID); err == nil {
+		_ = os.Remove(tmp)
+	}
+	if up.TransferID > 0 {
+		_ = s.st.DeleteTransfer(ctx, up.TransferID)
+	}
+	slog.Info("upload data missing; session discarded", "upload", up.ID, "path", up.Path)
 }
 
 func humanBytes(n int64) string {

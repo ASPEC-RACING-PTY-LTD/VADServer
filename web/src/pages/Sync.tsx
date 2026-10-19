@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, Folder, Gauge, Laptop, PauseCircle, RefreshCw, Timer, XCircle } from 'lucide-react'
-import { get } from '../lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, Folder, Gauge, Laptop, PauseCircle, RefreshCw, Timer, X, XCircle } from 'lucide-react'
+import { get, post } from '../lib/api'
 import { TransfersTable } from '../components/TransfersTable'
 import { formatBytes, formatDuration, formatSpeed, timeAgo } from '../lib/format'
 import { Badge, EmptyState, ErrorState, PageHeader, PageLoader, ProgressBar, Stat, Tabs } from '../components/ui'
@@ -99,7 +99,12 @@ function DeviceSync({ d }: { d: any }) {
 
 export default function SyncPage() {
   const [tab, setTab] = useState<'' | 'succeeded' | 'failed' | 'active'>('')
+  const qc = useQueryClient()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['sync-overview'], queryFn: () => get('/sync/overview'), refetchInterval: 5000 })
+  const dismiss = useMutation({
+    mutationFn: () => post('/sync/failures/dismiss'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sync-overview'] }),
+  })
   if (isLoading) return <PageLoader />
   if (error) return <ErrorState error={error} onRetry={refetch} />
   return (
@@ -115,6 +120,15 @@ export default function SyncPage() {
         <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/30 dark:bg-rose-500/10">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-rose-800 dark:text-rose-200">
             <AlertTriangle className="size-4" /> Recent failures
+            <button
+              type="button"
+              onClick={() => dismiss.mutate()}
+              disabled={dismiss.isPending}
+              title="Hide these failures. New failures will show again."
+              className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium hover:bg-rose-100 disabled:opacity-50 dark:hover:bg-rose-500/20"
+            >
+              <X className="size-3.5" /> Dismiss
+            </button>
           </div>
           <ul className="space-y-1 text-sm text-rose-700 dark:text-rose-300">
             {data.recent_failures.slice(0, 5).map((f: any) => (

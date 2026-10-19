@@ -114,7 +114,12 @@ func (s *Server) handleSyncOverview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	failed, err := s.st.ListTransfers(r.Context(), store.TransferFilter{UserID: u.ID, Status: "failed", Limit: 20})
+	seen, err := s.st.FailuresDismissedID(r.Context(), u.ID)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	failed, err := s.st.ListTransfers(r.Context(), store.TransferFilter{UserID: u.ID, Status: "failed", Limit: 20, After: seen})
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -129,6 +134,15 @@ func (s *Server) handleSyncOverview(w http.ResponseWriter, r *http.Request) {
 		views = append(views, viewUpload(&active[i]))
 	}
 	writeJSON(w, 200, map[string]any{"devices": out, "stats": ts, "recent_failures": failed, "active_uploads": views})
+}
+
+// handleSyncDismissFailures hides the current failures from the sync page.
+func (s *Server) handleSyncDismissFailures(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.DismissFailures(r.Context(), principal(r).User.ID); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {

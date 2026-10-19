@@ -1046,4 +1046,8 @@ CREATE TABLE node_jobs (
 );
 CREATE INDEX node_jobs_queue ON node_jobs(node_id, status, id);
 `,
+	// 11: dismissed sync failure warnings
+	`
+ALTER TABLE users ADD COLUMN failures_dismissed_id INTEGER NOT NULL DEFAULT 0;
+`,
 }
