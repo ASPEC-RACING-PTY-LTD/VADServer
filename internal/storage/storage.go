@@ -436,8 +436,12 @@ func (m *Manager) Place(ctx context.Context, userID int64, sha, tempPath string,
 	}
 	if err := commit(useLoc); err != nil {
 		if created {
-			if ok, _ := m.st.BlobExists(ctx, userID, sha); !ok {
-				_ = os.Remove(dest)
+			if ok, _ := m.st.BlobExists(context.WithoutCancel(ctx), userID, sha); !ok {
+				// Put a moved upload back where it came from, so a retry
+				// reuses it instead of sending the whole file again.
+				if useLoc != locID || os.Rename(dest, tempPath) != nil {
+					_ = os.Remove(dest)
+				}
 			}
 		}
 		return err

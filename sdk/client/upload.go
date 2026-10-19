@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -81,9 +83,59 @@ func (c *Client) CancelUpload(ctx context.Context, id string) error {
 	return c.Call(ctx, "DELETE", "/api/v1/uploads/"+id, nil, nil)
 }
 
+// CompleteUpload finishes a session. Finishing a large file can take the
+// server longer than a proxy holds a request open (Cloudflare: 100 s), so
+// the client asks for an asynchronous answer: while the server is still
+// finishing it replies 202 "finalizing" and this asks again. A dropped or
+// timed-out request is retried a few times as well; the server joins the
+// finish that is already running instead of starting over, so nothing is
+// hashed or sent again.
 func (c *Client) CompleteUpload(ctx context.Context, id string) (*UploadResult, error) {
-	var out UploadResult
-	return &out, c.Call(ctx, "POST", "/api/v1/uploads/"+id+"/complete", nil, &out)
+	hdr := http.Header{"X-Vd-Finalize": {"async"}}
+	dropped := 0
+	for {
+		var out UploadResult
+		st, err := c.doStatus(ctx, "POST", "/api/v1/uploads/"+id+"/complete", nil, &out, true, hdr)
+		var wait time.Duration
+		switch {
+		case err == nil && (st == http.StatusAccepted || out.Status == "finalizing"):
+			dropped, wait = 0, finishPoll
+		case err == nil:
+			return &out, nil
+		case dropped < finishRetries && finishDropped(ctx, err):
+			dropped++
+			wait = time.Duration(dropped) * finishPoll
+		default:
+			return &out, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
+}
+
+// finishPoll is how long CompleteUpload waits before asking again;
+// finishRetries bounds retries of dropped requests in a row.
+var (
+	finishPoll    = 2 * time.Second
+	finishRetries = 5
+)
+
+// finishDropped reports whether a complete request failed in transit (a
+// proxy or gateway gave up, or the connection dropped) rather than with an
+// answer from VaultDock.
+func finishDropped(ctx context.Context, err error) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	var ae *APIError
+	if errors.As(err, &ae) {
+		return ae.Status == 502 || ae.Status == 503 || ae.Status == 504 || (ae.Status >= 520 && ae.Status <= 527)
+	}
+	var ne net.Error
+	return errors.As(err, &ne) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF)
 }
 
 // HashSection returns the SHA-256 of length bytes at off.

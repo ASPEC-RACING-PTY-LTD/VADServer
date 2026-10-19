@@ -119,12 +119,13 @@ func (s *Store) UploadAny(ctx context.Context, id string) (*Upload, error) {
 	return scanUpload(s.DB.QueryRowContext(ctx, "SELECT "+uploadCols+uploadFrom+" WHERE u.id = ?", id))
 }
 
-// FindResumableUpload finds an open upload for the same target and content.
+// FindResumableUpload finds an open (or finishing) upload for the same
+// target and content.
 func (s *Store) FindResumableUpload(ctx context.Context, userID int64, deviceID *int64, path string, size int64, sha string) (*Upload, error) {
 	if sha == "" {
 		return nil, ErrNotFound
 	}
-	return scanUpload(s.DB.QueryRowContext(ctx, "SELECT "+uploadCols+uploadFrom+` WHERE u.user_id = ? AND u.path = ? AND u.size = ? AND u.sha256 = ? AND u.status = 'open' AND u.expires_at > ? AND (u.device_id IS ? ) ORDER BY u.updated_at DESC LIMIT 1`,
+	return scanUpload(s.DB.QueryRowContext(ctx, "SELECT "+uploadCols+uploadFrom+` WHERE u.user_id = ? AND u.path = ? AND u.size = ? AND u.sha256 = ? AND u.status IN ('open','finalizing') AND u.expires_at > ? AND (u.device_id IS ? ) ORDER BY u.updated_at DESC LIMIT 1`,
 		userID, path, size, sha, now(), deviceID))
 }
 
@@ -380,6 +381,11 @@ type TransferStats struct {
 	CompletedTotal int64 `json:"completed_total"`
 }
 
+// liveTransferWindow: an active transfer counts as active in the stats only
+// while its session received data within this window (or is being
+// finished); sessions a client abandoned stay open until they expire.
+const liveTransferWindow = int64(10 * 60 * 1000)
+
 func (s *Store) TransferStats(ctx context.Context, userID int64) (TransferStats, error) {
 	var st TransferStats
 	since := now() - 24*3600*1000
@@ -390,12 +396,12 @@ func (s *Store) TransferStats(ctx context.Context, userID int64) (TransferStats,
 		args = append(args, userID)
 	}
 	err := s.DB.QueryRowContext(ctx, `SELECT
-		COALESCE(SUM(status = 'active'),0),
+		COALESCE(SUM(status = 'active' AND (upload_id IS NULL OR upload_id IN (SELECT id FROM uploads WHERE status = 'finalizing' OR updated_at >= ?))),0),
 		COALESCE(SUM(status IN ('completed','deduplicated') AND finished_at >= ?),0),
 		COALESCE(SUM(status = 'failed' AND finished_at >= ?),0),
 		COALESCE(SUM(CASE WHEN status = 'completed' AND finished_at >= ? THEN bytes_done ELSE 0 END),0),
 		COALESCE(SUM(status IN ('completed','deduplicated')),0)
-		FROM transfers WHERE `+where, append([]any{since, since, since}, args...)...).Scan(&st.Active, &st.Completed24h, &st.Failed24h, &st.Bytes24h, &st.CompletedTotal)
+		FROM transfers WHERE `+where, append([]any{now() - liveTransferWindow, since, since, since}, args...)...).Scan(&st.Active, &st.Completed24h, &st.Failed24h, &st.Bytes24h, &st.CompletedTotal)
 	return st, err
 }
 

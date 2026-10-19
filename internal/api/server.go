@@ -704,6 +704,26 @@ func (s *Server) activity(r *http.Request, userID int64, action, target, details
 	s.st.LogActivity(context.WithoutCancel(r.Context()), a)
 }
 
+// activityLater captures the request's actor and address now and returns a
+// function that records the activity later (after the request has ended).
+func (s *Server) activityLater(r *http.Request, userID int64, action string) func(target, details string) {
+	p := principal(r)
+	a := store.Activity{Action: action, IP: s.clientIP(r)}
+	if userID > 0 {
+		a.UserID = &userID
+	}
+	if p != nil {
+		a.ActorID = &p.User.ID
+		a.DeviceID = p.deviceID()
+	}
+	ctx := context.WithoutCancel(r.Context())
+	return func(target, details string) {
+		rec := a
+		rec.Target, rec.Details = target, details
+		s.st.LogActivity(ctx, rec)
+	}
+}
+
 // routes holds one router per api-v1 auth label (§1). Every feature area
 // registers its routes from its own file through a mount hook,
 //

@@ -297,7 +297,8 @@ func TestPlaceAndOpen(t *testing.T) {
 		t.Fatalf("stray temp accepted: %v", err)
 	}
 
-	// a failed commit removes the newly created, unreferenced blob
+	// a failed commit removes the newly created, unreferenced blob and puts
+	// the upload back, so a retry reuses it
 	if err := f.m.Place(ctx, f.usr.ID, sum, tmp, f.loc.ID, func(int64) error { return errors.New("boom") }); err == nil {
 		t.Fatal("commit error swallowed")
 	}
@@ -305,8 +306,10 @@ func TestPlaceAndOpen(t *testing.T) {
 	if _, err := os.Stat(blob); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("orphan blob left after failed commit: %v", err)
 	}
+	if got, err := os.ReadFile(tmp); err != nil || string(got) != content {
+		t.Fatalf("upload not put back after failed commit: %v", err)
+	}
 
-	tmp = writeTemp(t, f, "upload-0000000000002", content)
 	if err := f.m.Place(ctx, f.usr.ID, sum, tmp, f.loc.ID, commit); err != nil {
 		t.Fatal(err)
 	}

@@ -189,7 +189,9 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 	// crash) is discarded and a fresh one started, so the client re-sends
 	// the whole file.
 	if existing, err := s.st.FindResumableUpload(r.Context(), u.ID, p.deviceID(), fullPath, req.Size, req.SHA256); err == nil {
-		if s.uploadDataIntact(existing) {
+		// A session that is being finished (or just was) is handed back as
+		// is: the client then completes it, which joins the running finish.
+		if existing.Status == "finalizing" || finalizeRecent(existing.ID) || s.uploadDataIntact(existing) {
 			writeJSON(w, 200, map[string]any{"status": "open", "resumed": true, "upload": viewUpload(existing)})
 			return
 		}
@@ -550,63 +552,207 @@ func (k *keyedLocks) acquire(ctx context.Context, key string, exclusive bool) (f
 	}
 }
 
+// Finishing an upload (hashing a multi-GB file, moving it into the blob
+// store, committing it) can take longer than a proxy in front of VaultDock
+// holds a request open: Cloudflare answers 524 after 100 seconds. It
+// therefore runs detached from the request, so a client that disconnects
+// loses nothing:
+//   - a retry while it runs (complete again, or a new upload request for the
+//     same file) joins it instead of starting over;
+//   - its outcome is kept for finalizeKeep, so a retry after it ended gets
+//     the same answer;
+//   - a session whose finish ended less than finalizeGrace ago is never
+//     treated as lost (its data has moved into the blob store) and wiped.
+//
+// A client that sends "X-VD-Finalize: async" gets 202 {"status":
+// "finalizing"} after finalizeWait and asks again; others wait until done.
+const (
+	finalizeGrace = 30 * time.Second
+	finalizeKeep  = 10 * time.Minute
+)
+
+// finalizeWait and beforeFinalize are variables so tests can shorten the wait
+// and hold a finish while it runs.
+var (
+	finalizeWait   = 30 * time.Second
+	beforeFinalize = func() {}
+)
+
+var errUploadDataLost = errors.New("upload data lost")
+
+type finalizeJob struct {
+	done  chan struct{}
+	res   *store.CommitResult
+	err   error
+	ended time.Time
+}
+
+var finalizers = struct {
+	sync.Mutex
+	m map[string]*finalizeJob
+}{m: map[string]*finalizeJob{}}
+
+func finalizeJobFor(id string) *finalizeJob {
+	finalizers.Lock()
+	defer finalizers.Unlock()
+	return finalizers.m[id]
+}
+
+// finalizeRecent reports whether a finish of this session is running or
+// ended less than finalizeGrace ago.
+func finalizeRecent(id string) bool {
+	j := finalizeJobFor(id)
+	if j == nil {
+		return false
+	}
+	select {
+	case <-j.done:
+		finalizers.Lock()
+		defer finalizers.Unlock()
+		return time.Since(j.ended) < finalizeGrace
+	default:
+		return true
+	}
+}
+
 func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 	p := principal(r)
 	up := s.loadUpload(w, r)
 	if up == nil {
 		return
 	}
-	// Take the upload lock exclusively so in-flight chunk writes finish
-	// before the status leaves "open"; later chunk writes see the new status.
-	unlock, err := uploadLocks.acquire(r.Context(), up.ID, true)
-	if err != nil {
+	job := finalizeJobFor(up.ID)
+	if job == nil {
+		// Take the upload lock exclusively so in-flight chunk writes finish
+		// before the status leaves "open"; later chunk writes see the new status.
+		unlock, err := uploadLocks.acquire(r.Context(), up.ID, true)
+		if err != nil {
+			return
+		}
+		if cur, err := s.st.Upload(r.Context(), up.UserID, up.ID); err == nil {
+			up = cur
+		}
+		if job = finalizeJobFor(up.ID); job == nil {
+			var serr error
+			job, serr = s.startFinalize(r, p, up)
+			if serr != nil {
+				unlock()
+				if errors.Is(serr, errUploadDataLost) {
+					s.discardUpload(r.Context(), up)
+					writeErr(w, r, errf(410, "upload_gone", "Upload data is missing; start a new upload"))
+					return
+				}
+				var ae *apiError
+				if errors.As(serr, &ae) && ae.Code == "incomplete" {
+					writeJSON(w, 409, map[string]any{"error": map[string]any{"code": "incomplete", "message": ae.Message}, "upload": viewUpload(up)})
+					return
+				}
+				writeErr(w, r, serr)
+				return
+			}
+		}
+		unlock()
+	}
+	var wait <-chan time.Time
+	if strings.EqualFold(r.Header.Get("X-VD-Finalize"), "async") {
+		t := time.NewTimer(finalizeWait)
+		defer t.Stop()
+		wait = t.C
+	}
+	select {
+	case <-job.done:
+	case <-wait:
+		cur, _ := s.st.Upload(r.Context(), up.UserID, up.ID)
+		if cur == nil {
+			cur = up
+		}
+		writeJSON(w, 202, map[string]any{"status": "finalizing", "upload": viewUpload(cur)})
+		return
+	case <-r.Context().Done():
+		return // the finish carries on; a retry joins it
+	}
+	if job.err != nil {
+		writeErr(w, r, job.err)
 		return
 	}
-	if cur, err := s.st.Upload(r.Context(), up.UserID, up.ID); err == nil {
-		up = cur
+	writeJSON(w, 200, map[string]any{"status": "complete", "result": job.res.Result, "node": job.res.Node})
+}
+
+// startFinalize checks that up can be finished and starts its detached
+// finish. Callers hold the upload lock exclusively.
+func (s *Server) startFinalize(r *http.Request, p *Principal, up *store.Upload) (*finalizeJob, error) {
+	switch up.Status {
+	case "done":
+		// Finished earlier and its outcome has expired: the file is committed.
+		j := &finalizeJob{done: make(chan struct{}), res: &store.CommitResult{Result: "created"}, ended: time.Now()}
+		if u, err := s.st.UserByID(r.Context(), up.UserID); err == nil {
+			if segs, err := pathutil.Split(up.Path); err == nil {
+				if n, err := s.st.Resolve(r.Context(), u, segs); err == nil {
+					j.res.Node = n
+				}
+			}
+		}
+		close(j.done)
+		return j, nil
+	case "open":
+	default:
+		return nil, errf(409, "upload_closed", "Upload is %s", up.Status)
 	}
 	if !up.Complete() {
-		unlock()
-		writeJSON(w, 409, map[string]any{"error": map[string]any{"code": "incomplete", "message": "Not all chunks have been received"}, "upload": viewUpload(up)})
-		return
+		return nil, errf(409, "incomplete", "Not all chunks have been received")
 	}
 	if !s.uploadDataIntact(up) {
-		unlock()
-		s.discardUpload(r.Context(), up)
-		writeErr(w, r, errf(410, "upload_gone", "Upload data is missing; start a new upload"))
-		return
+		return nil, errUploadDataLost // the caller discards it once unlocked
 	}
 	ok, err := s.st.SetUploadStatus(r.Context(), up.ID, "open", "finalizing")
-	unlock()
 	if err != nil {
-		writeErr(w, r, err)
-		return
+		return nil, err
 	}
 	if !ok {
-		writeErr(w, r, errf(409, "upload_busy", "Upload is already being finalised (status %s)", up.Status))
-		return
+		return nil, errf(409, "upload_busy", "Upload is already being finalised")
 	}
-	res, err := s.finalize(r.Context(), p, up)
-	if err != nil {
-		var ae *apiError
-		permanent := errors.As(err, &ae) || errors.Is(err, store.ErrQuota) || errors.Is(err, store.ErrIsDir) || errors.Is(err, store.ErrNotDir)
-		if permanent {
-			_, _ = s.st.SetUploadStatus(context.WithoutCancel(r.Context()), up.ID, "finalizing", "failed")
-			_ = s.st.FinishTransfer(context.WithoutCancel(r.Context()), nil, up.TransferID, "failed", errMessage(err), -1)
-			if tmp, terr := s.blobs.TempPath(up.LocationID, up.ID); terr == nil {
-				_ = os.Remove(tmp)
+	job := &finalizeJob{done: make(chan struct{})}
+	finalizers.Lock()
+	finalizers.m[up.ID] = job
+	finalizers.Unlock()
+	// Activity is recorded with the requesting client's details, captured now.
+	logUploaded := s.activityLater(r, up.UserID, "file.uploaded")
+	ctx := context.WithoutCancel(r.Context())
+	go func() {
+		beforeFinalize()
+		res, err := s.finalize(ctx, p, up)
+		if err != nil {
+			var ae *apiError
+			permanent := errors.As(err, &ae) || errors.Is(err, store.ErrQuota) || errors.Is(err, store.ErrIsDir) || errors.Is(err, store.ErrNotDir)
+			if permanent {
+				_, _ = s.st.SetUploadStatus(ctx, up.ID, "finalizing", "failed")
+				_ = s.st.FinishTransfer(ctx, nil, up.TransferID, "failed", errMessage(err), -1)
+				if tmp, terr := s.blobs.TempPath(up.LocationID, up.ID); terr == nil {
+					_ = os.Remove(tmp)
+				}
+			} else {
+				_, _ = s.st.SetUploadStatus(ctx, up.ID, "finalizing", "open")
+				slog.Warn("upload finish failed; the session stays open for a retry", "upload", up.ID, "err", err)
 			}
 		} else {
-			_, _ = s.st.SetUploadStatus(context.WithoutCancel(r.Context()), up.ID, "finalizing", "open")
+			s.blobs.Remove(ctx, res.Freed)
+			if res.Result != "unchanged" && res.Result != "skipped" {
+				logUploaded(res.Node.Path, humanBytes(up.Size)+" "+res.Result)
+			}
 		}
-		writeErr(w, r, err)
-		return
-	}
-	s.blobs.Remove(r.Context(), res.Freed)
-	if res.Result != "unchanged" && res.Result != "skipped" {
-		s.activity(r, up.UserID, "file.uploaded", res.Node.Path, humanBytes(up.Size)+" "+res.Result, false)
-	}
-	writeJSON(w, 200, map[string]any{"status": "complete", "result": res.Result, "node": res.Node})
+		finalizers.Lock()
+		job.res, job.err, job.ended = res, err, time.Now()
+		finalizers.Unlock()
+		close(job.done)
+		time.AfterFunc(finalizeKeep, func() {
+			finalizers.Lock()
+			if finalizers.m[up.ID] == job {
+				delete(finalizers.m, up.ID)
+			}
+			finalizers.Unlock()
+		})
+	}()
+	return job, nil
 }
 
 func errMessage(err error) string {
@@ -739,6 +885,9 @@ func (s *Server) uploadDataIntact(up *store.Upload) bool {
 // file and its transfer record go, so the next attempt registers as a new
 // transfer and the client uploads the file again in full.
 func (s *Server) discardUpload(ctx context.Context, up *store.Upload) {
+	if finalizeRecent(up.ID) {
+		return // its data was just moved into the blob store, not lost
+	}
 	ctx = context.WithoutCancel(ctx)
 	unlock, err := uploadLocks.acquire(ctx, up.ID, true)
 	if err != nil {
