@@ -914,6 +914,8 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 					r.Get("/admin/health", s.handleAdminHealth)
 					r.Get("/admin/update", s.handleAdminUpdate)
 					r.Post("/admin/update/check", s.handleAdminUpdateCheck)
+					r.Post("/admin/update/install", s.handleAdminUpdateInstall)
+					r.Post("/admin/update/auto", s.handleAdminUpdateAuto)
 					r.Get("/admin/audit", s.handleAdminAudit)
 					r.Post("/admin/maintenance/cleanup", s.handleAdminCleanup)
 				})

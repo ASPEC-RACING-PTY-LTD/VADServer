@@ -33,6 +33,12 @@ type UpdateStatus struct {
 	// AutoUpdate reflects the installer's scheduled updates ("on" or "off").
 	AutoUpdate string `json:"auto_update"`
 	Command    string `json:"upgrade_command"`
+	// Helper: the installer's control job on the host is running, so the
+	// admin console can install updates and change automatic updates
+	// itself (update_control.go).
+	Helper       bool        `json:"helper"`
+	HelperSeenAt int64       `json:"helper_seen_at,omitempty"`
+	Job          *ControlJob `json:"job,omitempty"`
 }
 
 type updateChecker struct {
@@ -58,7 +64,10 @@ func newUpdateChecker(repo string, enabled bool, autoUpdate string) *updateCheck
 			Repo:       repo,
 			Current:    Version,
 			AutoUpdate: autoUpdate,
-			Command:    "~/VaultDock/app/install.sh upgrade",
+			// The released installer: it also sets up the host helper that
+			// lets the console install later updates (an older local copy
+			// does not).
+			Command: upgradeCommand(repo),
 		},
 	}
 }
@@ -140,9 +149,16 @@ func (s *Server) RunUpdateChecks(ctx context.Context) {
 }
 
 func (s *Server) handleAdminUpdate(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, s.updates.snapshot())
+	writeJSON(w, 200, s.withControl(s.updates.snapshot()))
 }
 
 func (s *Server) handleAdminUpdateCheck(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, s.updates.check(r.Context()))
+	writeJSON(w, 200, s.withControl(s.updates.check(r.Context())))
+}
+
+func upgradeCommand(repo string) string {
+	if repo == "" {
+		return "~/VaultDock/app/install.sh upgrade"
+	}
+	return "curl -fsSL https://github.com/" + repo + "/releases/latest/download/install.sh | bash -s -- upgrade"
 }

@@ -1471,6 +1471,7 @@ do_install() {
 	info "Starting VaultDock"
 	compose up -d
 	wait_healthy || die "Installation finished but VaultDock is not healthy. Fix the problem above, then run: $0 upgrade"
+	ensure_control_cron
 	print_summary
 	link_source_env
 	kek_backup_prompt
@@ -1590,6 +1591,7 @@ do_upgrade() {
 	if compose up -d --remove-orphans && wait_healthy; then
 		rm -rf -- "$APP.old"
 		ok "Upgrade complete. Backup kept at $bk"
+		ensure_control_cron
 		link_source_env
 		finish_image_switch
 		if [ -n "$MODIFIED_FILES" ]; then warn "Locally modified files:$MODIFIED_FILES (see the .new/.local copies in $APP)."; fi
@@ -1665,6 +1667,97 @@ do_auto_update() {
 	esac
 }
 
+# --- admin console control (Admin > Updates buttons) -----------------------------
+# The server runs in a locked-down container and cannot run this installer.
+# A per-minute cron job ("install.sh control") does it on the host: it writes
+# a heartbeat to <state>/control/helper.json and carries out one request the
+# admin console left in <state>/control/request.json (upgrade, auto-update-on
+# or auto-update-off), reporting progress in <state>/control/status.json.
+# A request only selects one of those fixed actions; nothing in it is run.
+CONTROL_TAG="# vaultdock-control $DIR"
+
+control_line() {
+	printf '* * * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin VAULTDOCK_DIR=%q VAULTDOCK_YES=1 %q control >>%q 2>&1 %s\n' \
+		"$DIR" "$APP/install.sh" "$DIR/logs/control.log" "$CONTROL_TAG"
+}
+
+# ensure_control_cron installs the control job (install, upgrade).
+ensure_control_cron() {
+	if ! command -v crontab >/dev/null 2>&1; then
+		warn "cron is not installed, so the admin console cannot install updates itself. Install cron and run '$APP/install.sh upgrade' again, or upgrade from the command line."
+		return 0
+	fi
+	mkdir -p -- "$DIR/logs"
+	{ crontab -l 2>/dev/null | grep -vF "$CONTROL_TAG" || true; control_line; } | crontab - ||
+		warn "Could not add the control job to cron; the admin console cannot install updates itself."
+}
+
+remove_control_cron() {
+	command -v crontab >/dev/null 2>&1 || return 0
+	{ crontab -l 2>/dev/null | grep -vF "$CONTROL_TAG" || true; } | crontab - || true
+}
+
+# json_str TEXT prints TEXT as a JSON string (tabs as spaces, other control
+# characters dropped).
+json_str() {
+	printf '"%s"' "$(printf '%s' "$1" | tr '\t' ' ' | tr -d '\000-\010\013-\037' |
+		sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')"
+}
+
+ctl_write() { # ctl_write FILE JSON: atomic, readable by the container
+	printf '%s\n' "$2" >"$1.tmp" && chmod 0644 -- "$1.tmp" && mv -f -- "$1.tmp" "$1"
+}
+
+ctl_status() { # ctl_status DIR ID ACTION STATE STARTED FINISHED EXIT LOGFILE
+	local logtxt=""
+	if [ -n "$8" ] && [ -f "$8" ]; then logtxt=$(tail -n 40 -- "$8" | sed $'s/\033\[[0-9;]*[A-Za-z]//g'); fi
+	ctl_write "$1/status.json" "{\"id\":$(json_str "$2"),\"action\":$(json_str "$3"),\"state\":\"$4\",\"started_at\":${5:-0},\"finished_at\":${6:-0},\"exit_code\":${7:-0},\"log\":$(json_str "$logtxt")}"
+}
+
+auto_update_state() { if command -v crontab >/dev/null 2>&1 && crontab -l 2>/dev/null | grep -qF "$CRON_TAG"; then echo on; else echo off; fi; }
+
+ctl_heartbeat() {
+	ctl_write "$1/helper.json" "{\"seen_at\":$(date +%s),\"auto_update\":\"$(auto_update_state)\",\"version\":$(json_str "$(env_get VAULTDOCK_VERSION)")}"
+}
+
+do_control() {
+	installed || return 0
+	local ctl; ctl="$(state_path)/control"
+	mkdir -p -- "$ctl" 2>/dev/null || return 0
+	if [ "$(id -u)" = 0 ]; then chown --reference="$(state_path)" -- "$ctl" 2>/dev/null || true; fi
+	# One run at a time: an upgrade takes longer than a minute.
+	exec 9>"$DIR/.control.lock"
+	if command -v flock >/dev/null 2>&1; then flock -n 9 || return 0; fi
+	ctl_heartbeat "$ctl"
+	[ -f "$ctl/request.json" ] || return 0
+	local req action id
+	req=$(head -c 4096 -- "$ctl/request.json" 2>/dev/null | tr -d '\n' || true)
+	rm -f -- "$ctl/request.json"
+	action=$(printf '%s' "$req" | sed -n 's/.*"action"[[:space:]]*:[[:space:]]*"\([a-z-]*\)".*/\1/p')
+	id=$(printf '%s' "$req" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([A-Za-z0-9_-]\{1,64\}\)".*/\1/p')
+	[ -n "$id" ] || return 0
+	local now; now=$(date +%s)
+	case "$action" in
+	upgrade | auto-update-on | auto-update-off) ;;
+	*) ctl_status "$ctl" "$id" "$action" failed "$now" "$now" 2 ""; return 0 ;;
+	esac
+	mkdir -p -- "$DIR/logs"
+	local log="$DIR/logs/control-$id.log" rc=0 old
+	# Keep the logs of the last 10 requests.
+	{ ls -1t -- "$DIR"/logs/control-*.log 2>/dev/null || true; } | tail -n +11 | while IFS= read -r old; do rm -f -- "$old"; done
+	ctl_status "$ctl" "$id" "$action" running "$now" 0 0 ""
+	printf '%s: %s requested from the admin console\n' "$(date -u +%FT%TZ)" "$action"
+	case "$action" in
+	upgrade) VAULTDOCK_YES=1 "$APP/install.sh" upgrade >"$log" 2>&1 </dev/null || rc=$? ;;
+	auto-update-on) VAULTDOCK_YES=1 "$APP/install.sh" auto-update on >"$log" 2>&1 </dev/null || rc=$? ;;
+	auto-update-off) VAULTDOCK_YES=1 "$APP/install.sh" auto-update off >"$log" 2>&1 </dev/null || rc=$? ;;
+	esac
+	local state=done
+	[ "$rc" = 0 ] || state=failed
+	ctl_status "$ctl" "$id" "$action" "$state" "$now" "$(date +%s)" "$rc" "$log"
+	ctl_heartbeat "$ctl"
+}
+
 # --- uninstall -----------------------------------------------------------------
 do_uninstall() {
 	installed || die "No VaultDock installation found in $DIR."
@@ -1685,6 +1778,7 @@ EOF
 	1)
 		confirm "Stop and remove the VaultDock containers?" n || die "Cancelled."
 		if command -v crontab >/dev/null 2>&1; then current_crontab | crontab - || true; fi
+		remove_control_cron
 		compose down --remove-orphans
 		docker image rm vaultdock:local vaultdock:rollback >/dev/null 2>&1 || true
 		ok "Services removed. Your data is still in $DIR (storage: $storage)."
@@ -1693,6 +1787,7 @@ EOF
 		warn "This permanently deletes every file stored in VaultDock. It cannot be undone."
 		typed_confirm "DELETE ALL DATA" || die "Cancelled. Nothing was deleted."
 		if command -v crontab >/dev/null 2>&1; then current_crontab | crontab - || true; fi
+		remove_control_cron
 		compose down --remove-orphans --volumes
 		docker image rm vaultdock:local vaultdock:rollback >/dev/null 2>&1 || true
 		if [ -n "$storage" ] && [ "$storage" != "/" ] && [ -d "$storage" ]; then
@@ -2021,6 +2116,7 @@ main() {
 	uninstall) do_uninstall ;;
 	status) do_status ;;
 	auto-update) do_auto_update "${2:-status}" ;;
+	control) do_control ;;
 	env-review) do_env_review ;;
 	integrations) do_integrations "${2:-}" ;;
 	kek-status) do_kek_status ;;
