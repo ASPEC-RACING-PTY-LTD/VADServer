@@ -39,14 +39,14 @@ import (
 )
 
 const (
-	copyVerifyEvery    = 7 * 24 * time.Hour  // re-check copies and originals
-	copyPlanEvery      = 10 * time.Minute    // re-plan without a rule change
-	copyNodeInFlight   = 2                   // put jobs per node at a time
-	copyJobClaimedMax  = 6 * time.Hour       // a claimed job older than this failed
-	copyJobQueuedMax   = 24 * time.Hour      // a queued job older than this failed
-	copyMaxBackoff     = 6 * time.Hour       // between retries of a failed copy
-	copyReadFromNode   = 10 * time.Minute    // a read waits this long for a node
-	copyRecoverTimeout = 2 * time.Hour       // recovering a deleted file from a node
+	copyVerifyEvery    = 7 * 24 * time.Hour // re-check copies and originals
+	copyPlanEvery      = 10 * time.Minute   // re-plan without a rule change
+	copyNodeInFlight   = 2                  // put jobs per node at a time
+	copyJobClaimedMax  = 6 * time.Hour      // a claimed job older than this failed
+	copyJobQueuedMax   = 24 * time.Hour     // a queued job older than this failed
+	copyMaxBackoff     = 6 * time.Hour      // between retries of a failed copy
+	copyReadFromNode   = 10 * time.Minute   // a read waits this long for a node
+	copyRecoverTimeout = 2 * time.Hour      // recovering a deleted file from a node
 )
 
 type copyService struct {
@@ -476,7 +476,9 @@ func (s *Server) restoreFromCopies(ctx context.Context, userID int64, sha string
 	if err != nil {
 		return err
 	}
-	sort.SliceStable(copies, func(i, j int) bool { return strings.HasPrefix(copies[i].Target, "local:") && !strings.HasPrefix(copies[j].Target, "local:") })
+	sort.SliceStable(copies, func(i, j int) bool {
+		return strings.HasPrefix(copies[i].Target, "local:") && !strings.HasPrefix(copies[j].Target, "local:")
+	})
 	last := errors.New("no copy of this file exists")
 	for _, c := range copies {
 		if c.State != "ok" && c.State != "deleting" {

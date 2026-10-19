@@ -34,7 +34,9 @@ type nodeKeyFile struct {
 
 var nodeKeyFiles sync.Map // *Server -> *nodeKeyFile
 
-func (s *Server) nodeKeyPath() string { return filepath.Join(s.cfg.StateDir, "keys", "node-copies.key") }
+func (s *Server) nodeKeyPath() string {
+	return filepath.Join(s.cfg.StateDir, "keys", "node-copies.key")
+}
 
 // nodeFileKey loads (creating on first use) the key that seals copy keys.
 func (s *Server) nodeFileKey() ([]byte, error) {
@@ -77,7 +79,9 @@ func (s *Server) nodeFileKey() ([]byte, error) {
 	return b, nil
 }
 
-func nodeKeyAAD(nodeID int64) []byte { return []byte("vaultdock node copy key:" + strconv.FormatInt(nodeID, 10)) }
+func nodeKeyAAD(nodeID int64) []byte {
+	return []byte("vaultdock node copy key:" + strconv.FormatInt(nodeID, 10))
+}
 
 func (s *Server) sealNodeKey(nodeID int64, key []byte) (string, error) {
 	fk, err := s.nodeFileKey()

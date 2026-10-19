@@ -46,10 +46,10 @@ type joinState struct {
 
 // Agent runs one node.
 type Agent struct {
-	cfg     Config
-	log     *slog.Logger
-	http    *http.Client
-	started time.Time
+	cfg       Config
+	log       *slog.Logger
+	http      *http.Client
+	started   time.Time
 	mu        sync.Mutex // guards status, lastErr and locations
 	status    Status
 	lastErr   string

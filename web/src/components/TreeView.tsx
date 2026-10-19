@@ -60,7 +60,13 @@ export function TreeView<T = unknown>({ ariaLabel, roots, onLoadChildren, checka
   const [errors, setErrors] = useState<ReadonlyMap<string, string>>(new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(defaultExpanded))
   const [version, setVersion] = useState(0)
-  const [focusId, setFocusId] = useState<string | null>(null)
+  const [focusId, setFocusIdState] = useState<string | null>(null)
+  // The latest focused row, readable by effects queued before it changed.
+  const focusIdRef = useRef<string | null>(null)
+  const setFocusId = useCallback((id: string | null) => {
+    focusIdRef.current = id
+    setFocusIdState(id)
+  }, [])
   const [innerChecked, setInnerChecked] = useState<string[]>([])
   const checkedIds = checked ?? innerChecked
   const rowRefs = useRef(new Map<string, HTMLDivElement>())
@@ -203,8 +209,12 @@ export function TreeView<T = unknown>({ ariaLabel, roots, onLoadChildren, checka
   }
 
   // Keep DOM focus on the focused row when the list re-renders under keyboard use.
+  // It reads the ref, not the rendered focusId: an effect queued before a
+  // keypress moved focus must not pull focus back to the previous row.
   useEffect(() => {
-    if (focusId && treeRef.current?.contains(document.activeElement)) rowRefs.current.get(focusId)?.focus()
+    const id = focusIdRef.current
+    const el = id ? rowRefs.current.get(id) : undefined
+    if (el && el !== document.activeElement && treeRef.current?.contains(document.activeElement)) el.focus()
   }, [focusId, rows])
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
