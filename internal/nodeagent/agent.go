@@ -50,9 +50,10 @@ type Agent struct {
 	log     *slog.Logger
 	http    *http.Client
 	started time.Time
-	mu      sync.Mutex // guards status and lastErr (read by the status endpoint)
-	status  Status
-	lastErr string
+	mu        sync.Mutex // guards status, lastErr and locations
+	status    Status
+	lastErr   string
+	locations *locations
 }
 
 func (a *Agent) current() Status {
@@ -300,6 +301,9 @@ func (a *Agent) localIP() string {
 func (a *Agent) heartbeats(ctx context.Context, id int64, secret string) error {
 	auth := map[string]string{"Authorization": fmt.Sprintf("%s %d.%s", nodeapi.AuthScheme, id, secret)}
 	interval := 30 * time.Second
+	jctx, stopJobs := context.WithCancel(ctx)
+	defer stopJobs()
+	go a.jobLoop(jctx, auth)
 	for {
 		host, _ := os.Hostname()
 		total, free := diskSpace(a.cfg.Dir)
@@ -308,6 +312,7 @@ func (a *Agent) heartbeats(ctx context.Context, id int64, secret string) error {
 			Name: a.cfg.Name, Hostname: host, IP: a.localIP(), Version: Version, OS: runtime.GOOS, Arch: runtime.GOARCH,
 			Port: a.cfg.Port, PublicURL: a.cfg.PublicURL, DiskTotal: total, DiskFree: free,
 			UptimeSeconds: int64(time.Since(a.started).Seconds()), LastError: a.lastError(),
+			TerminalEnabled: a.cfg.Terminal, StorageRoots: a.cfg.StorageRoots, Locations: a.locationStatus(),
 		}, auth, &resp)
 		switch {
 		case code == 401:

@@ -25,7 +25,7 @@ var newTables = []string{
 	// 8
 	"server_keys", "key_audit", "repo_keys", "device_keys", "device_modules", "device_profiles", "profile_requests",
 	// 10
-	"storage_nodes",
+	"storage_nodes", "node_locations", "copy_rules", "blob_copies", "blob_checks", "node_jobs",
 }
 
 // newColumns lists columns added to pre-existing tables.

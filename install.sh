@@ -30,7 +30,8 @@
 #                      never approves removing settings)
 #   VAULTDOCK_ENV_APPROVE_REMOVE=A,B  same as --approve-env-removal
 #   VAD_NODE_DIR, VAD_NODE_SERVER_URL, VAD_NODE_NAME, VAD_NODE_PORT,
-#   VAD_NODE_PUBLIC_URL   answers for "Install Node"; VAD_NODE_NO_WAIT=1 skips
+#   VAD_NODE_PUBLIC_URL, VAD_NODE_STORAGE, VAD_NODE_TERMINAL_USER
+#                      answers for "Install Node"; VAD_NODE_NO_WAIT=1 skips
 #                      waiting for the admin's approval
 #
 # Only the runtime files are installed (app/: docker-compose.yml, install.sh,
@@ -1672,6 +1673,8 @@ do_install_node() {
 		# shellcheck disable=SC1091
 		local url; url=$(grep -E '^VAD_NODE_SERVER_URL=' "$ndir/.env" | tail -n1 | cut -d= -f2-)
 		node_fetch_agent "$url" "$ndir"
+		node_write_unit "$ndir"
+		systemctl daemon-reload
 		systemctl restart "$NODE_SERVICE"
 		ok "Agent updated and restarted."
 		node_wait "$ndir" "$url"
@@ -1721,6 +1724,21 @@ do_install_node() {
 	fi
 	listen="0.0.0.0:$port"
 
+	# Storage for copies and terminal access (both decided by this machine's owner).
+	local storage terminal=off tuser=root
+	ask storage "Folder on this machine where VaultDock may keep copies" "${VAD_NODE_STORAGE:-$ndir/storage}"
+	storage=${storage%/}
+	case "$storage" in /*) ;; *) die "The storage folder must be an absolute path." ;; esac
+	case "$storage" in *[[:space:],]*) die "The storage folder must not contain spaces or commas." ;; esac
+	mkdir -p -- "$storage"
+	chmod 750 -- "$storage"
+	warn "A terminal lets this server's superusers run commands on this machine from the web console."
+	if confirm "Allow terminal access to this machine from the server?" n; then
+		terminal=on
+		ask tuser "Run terminals as this user" "${VAD_NODE_TERMINAL_USER:-root}"
+		id "$tuser" >/dev/null 2>&1 || die "User $tuser does not exist."
+	fi
+
 	# 5. Agent from the server
 	mkdir -p -- "$ndir/bin" "$ndir/data"
 	chmod 700 -- "$ndir/data"
@@ -1739,13 +1757,42 @@ VAD_NODE_PROXY=$proxy
 VAD_NODE_PUBLIC_URL=$public
 VAD_NODE_IP=$ip
 VAD_NODE_KEY_FILE=$NODE_KEY_DIR/node.key
+# Folders the server may store (encrypted) copies in, comma separated.
+VAD_NODE_STORAGE_ROOTS=$storage
+# on = the server's superusers may open a terminal here (as VAD_NODE_TERMINAL_USER).
+# After changing either, run the installer again ("Install Node" keeps the approval).
+VAD_NODE_TERMINAL=$terminal
+VAD_NODE_TERMINAL_USER=$tuser
 EOF
 	umask 027
 	ok "Configuration written to $ndir/.env"
 
 	# 7. systemd service
+	node_write_unit "$ndir"
+	systemctl daemon-reload
+	systemctl enable "$NODE_SERVICE" >/dev/null 2>&1
+	systemctl restart "$NODE_SERVICE"
+	ok "Service $NODE_SERVICE enabled and started (survives restarts)."
+
+	# 8. Join request and approval
+	node_wait "$ndir" "$url"
+}
+
+# node_write_unit DIR: writes the systemd unit from DIR/.env. Without terminal
+# access the service may only write its own folder, the key folder and the
+# storage folders; with it, the shell needs the whole system, so the
+# filesystem restrictions are left out.
+node_write_unit() {
+	local ndir=$1 roots terminal hardening
+	roots=$(grep -E '^VAD_NODE_STORAGE_ROOTS=' "$ndir/.env" | tail -n1 | cut -d= -f2- | tr ',' ' ')
+	terminal=$(grep -E '^VAD_NODE_TERMINAL=' "$ndir/.env" | tail -n1 | cut -d= -f2-)
 	mkdir -p -- "$NODE_KEY_DIR"
 	chmod 700 -- "$NODE_KEY_DIR"
+	if [ "$terminal" = on ]; then
+		hardening="PrivateTmp=yes"
+	else
+		hardening=$(printf 'NoNewPrivileges=yes\nPrivateTmp=yes\nProtectSystem=strict\nReadWritePaths=%s %s %s' "$ndir" "$NODE_KEY_DIR" "$roots")
+	fi
 	cat >"$NODE_UNIT" <<EOF
 [Unit]
 Description=VaultDock storage node agent
@@ -1759,21 +1806,11 @@ WorkingDirectory=$ndir
 ExecStart=$ndir/bin/vad-node run --dir $ndir
 Restart=always
 RestartSec=5
-NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ReadWritePaths=$ndir $NODE_KEY_DIR
+$hardening
 
 [Install]
 WantedBy=multi-user.target
 EOF
-	systemctl daemon-reload
-	systemctl enable "$NODE_SERVICE" >/dev/null 2>&1
-	systemctl restart "$NODE_SERVICE"
-	ok "Service $NODE_SERVICE enabled and started (survives restarts)."
-
-	# 8. Join request and approval
-	node_wait "$ndir" "$url"
 }
 
 # node_fetch_agent URL DIR: downloads the agent for this machine from the

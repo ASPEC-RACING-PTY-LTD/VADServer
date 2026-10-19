@@ -955,6 +955,8 @@ CREATE TABLE storage_nodes (
 	last_ip          TEXT NOT NULL DEFAULT '',
 	last_seen_at     INTEGER,
 	last_error       TEXT NOT NULL DEFAULT '',
+	terminal_enabled INTEGER NOT NULL DEFAULT 0,
+	storage_roots    TEXT NOT NULL DEFAULT '',
 	decided_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	decided_at       INTEGER,
 	expires_at       INTEGER NOT NULL,
@@ -962,5 +964,85 @@ CREATE TABLE storage_nodes (
 	updated_at       INTEGER NOT NULL
 );
 CREATE INDEX storage_nodes_status ON storage_nodes(status);
+
+-- Folders on a node that hold copies (never primary storage).
+CREATE TABLE node_locations (
+	id         INTEGER PRIMARY KEY,
+	node_id    INTEGER NOT NULL REFERENCES storage_nodes(id) ON DELETE CASCADE,
+	name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	path       TEXT NOT NULL,
+	status     TEXT NOT NULL DEFAULT 'preparing' CHECK (status IN ('preparing','ok','error')),
+	error      TEXT NOT NULL DEFAULT '',
+	disk_total INTEGER NOT NULL DEFAULT 0,
+	disk_free  INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	UNIQUE (node_id, path)
+);
+
+-- "Files matching X stored in source get a copy on target".
+-- target: 'local:<storage_locations.id>' or 'node:<node_locations.id>'.
+CREATE TABLE copy_rules (
+	id                 INTEGER PRIMARY KEY,
+	name               TEXT NOT NULL,
+	enabled            INTEGER NOT NULL DEFAULT 1,
+	user_id            INTEGER REFERENCES users(id) ON DELETE CASCADE,
+	source_location_id INTEGER REFERENCES storage_locations(id) ON DELETE CASCADE,
+	target             TEXT NOT NULL,
+	path_pattern       TEXT NOT NULL DEFAULT '',
+	extensions         TEXT NOT NULL DEFAULT '',
+	min_size           INTEGER NOT NULL DEFAULT 0,
+	max_size           INTEGER NOT NULL DEFAULT 0,
+	delete_delay_hours INTEGER NOT NULL DEFAULT 168,
+	created_at         INTEGER NOT NULL,
+	updated_at         INTEGER NOT NULL
+);
+
+-- One row per stored copy of a blob on a target.
+CREATE TABLE blob_copies (
+	user_id            INTEGER NOT NULL,
+	sha256             TEXT NOT NULL,
+	target             TEXT NOT NULL,
+	state              TEXT NOT NULL CHECK (state IN ('pending','ok','failed','deleting')),
+	size               INTEGER NOT NULL DEFAULT 0,
+	stored_sha256      TEXT NOT NULL DEFAULT '',
+	last_path          TEXT NOT NULL DEFAULT '',
+	delete_delay_hours INTEGER NOT NULL DEFAULT 168,
+	attempts           INTEGER NOT NULL DEFAULT 0,
+	next_at            INTEGER NOT NULL DEFAULT 0,
+	delete_at          INTEGER,
+	verified_at        INTEGER,
+	last_error         TEXT NOT NULL DEFAULT '',
+	created_at         INTEGER NOT NULL,
+	updated_at         INTEGER NOT NULL,
+	PRIMARY KEY (user_id, sha256, target)
+);
+CREATE INDEX blob_copies_state ON blob_copies(state, next_at);
+CREATE INDEX blob_copies_target ON blob_copies(target, state);
+
+-- Integrity checks of the primary copy of blobs that have copies.
+CREATE TABLE blob_checks (
+	user_id     INTEGER NOT NULL,
+	sha256      TEXT NOT NULL,
+	verified_at INTEGER NOT NULL,
+	ok          INTEGER NOT NULL,
+	error       TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (user_id, sha256)
+);
+
+-- Work for nodes, which pull it (long poll) so they need no inbound access.
+CREATE TABLE node_jobs (
+	id          INTEGER PRIMARY KEY,
+	node_id     INTEGER NOT NULL REFERENCES storage_nodes(id) ON DELETE CASCADE,
+	kind        TEXT NOT NULL,
+	payload     TEXT NOT NULL DEFAULT '{}',
+	status      TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','claimed','done','failed')),
+	result      TEXT NOT NULL DEFAULT '{}',
+	error       TEXT NOT NULL DEFAULT '',
+	created_at  INTEGER NOT NULL,
+	claimed_at  INTEGER,
+	finished_at INTEGER
+);
+CREATE INDEX node_jobs_queue ON node_jobs(node_id, status, id);
 `,
 }

@@ -29,6 +29,13 @@ type Config struct {
 	PublicURL string // VAD_NODE_PUBLIC_URL
 	IP        string // VAD_NODE_IP: the machine's address reported at install
 	KeyFile   string // VAD_NODE_KEY_FILE: key that encrypts the node secret
+	// StorageRoots (VAD_NODE_STORAGE_ROOTS, comma separated): the only
+	// folders the server may store copies in; empty = any absolute folder.
+	StorageRoots []string
+	// Terminal (VAD_NODE_TERMINAL=on) allows the server's superusers to open
+	// a terminal here, as TerminalUser (VAD_NODE_TERMINAL_USER, default root).
+	Terminal     bool
+	TerminalUser string
 }
 
 // DefaultKeyFile keeps the encryption key outside the installation folder, so
@@ -93,6 +100,13 @@ func LoadConfig(dir string) (Config, error) {
 		KeyFile:   get("VAD_NODE_KEY_FILE", DefaultKeyFile),
 	}
 	c.Port, _ = strconv.ParseInt(get("VAD_NODE_PORT", "0"), 10, 64)
+	for _, r := range strings.FieldsFunc(get("VAD_NODE_STORAGE_ROOTS", ""), func(r rune) bool { return r == ',' || r == ' ' }) {
+		if filepath.IsAbs(r) {
+			c.StorageRoots = append(c.StorageRoots, filepath.Clean(r))
+		}
+	}
+	c.Terminal = strings.EqualFold(get("VAD_NODE_TERMINAL", "off"), "on")
+	c.TerminalUser = get("VAD_NODE_TERMINAL_USER", "root")
 	c.Listen = get("VAD_NODE_LISTEN", "")
 	if c.Listen == "" && c.Port > 0 {
 		c.Listen = fmt.Sprintf("0.0.0.0:%d", c.Port)

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Server, X } from 'lucide-react'
+import { Check, Copy, FolderPlus, Server, SquareTerminal, X } from 'lucide-react'
 import { del, errorMessage, get, patch, post } from '../../lib/api'
 import { formatBytes, formatDate, timeAgo } from '../../lib/format'
-import { Badge, Button, EmptyState, ErrorState, PageLoader, Toggle, useUI } from '../../components/ui'
+import { Badge, Button, EmptyState, ErrorState, Field, PageLoader, Toggle, useUI } from '../../components/ui'
+import { NodeTerminal } from './Terminal'
 
 interface StorageNode {
   id: number
@@ -29,6 +30,8 @@ interface StorageNode {
   last_seen_at: number | null
   last_error: string
   online: boolean
+  terminal_enabled: boolean
+  storage_roots: string
   expires_at: number
   created_at: number
 }
@@ -39,6 +42,7 @@ export default function NodesTab() {
   const qc = useQueryClient()
   const { toast, confirm } = useUI()
   const [busy, setBusy] = useState<string | null>(null)
+  const [terminal, setTerminal] = useState<StorageNode | null>(null)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-nodes'],
     queryFn: () => get<{ items: StorageNode[]; server_version: string }>('/admin/nodes'),
@@ -196,6 +200,11 @@ export default function NodesTab() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {n.state === 'approved' && n.terminal_enabled && (
+                      <Button size="sm" variant="ghost" icon={<SquareTerminal className="size-4" />} onClick={() => setTerminal(n)}>
+                        Terminal
+                      </Button>
+                    )}
                     {n.state === 'approved' && n.update_available && !n.update_requested && (
                       <Button size="sm" variant="ghost" loading={busy === `update-${n.id}`} onClick={() => act(`update-${n.id}`, () => post(`/admin/nodes/${n.id}/update`), `${n.name} updates on its next check-in`)}>
                         Update now
@@ -225,6 +234,133 @@ export default function NodesTab() {
           </table>
         )}
       </section>
+
+      <NodeLocations nodes={data.items.filter((n) => n.state === 'approved')} />
+      {terminal && <NodeTerminal nodeId={terminal.id} nodeName={terminal.name} onClose={() => setTerminal(null)} />}
     </div>
+  )
+}
+
+interface NodeLocation {
+  id: number
+  node_id: number
+  node_name: string
+  name: string
+  path: string
+  status: 'preparing' | 'ok' | 'error'
+  error: string
+  disk_total: number
+  disk_free: number
+}
+
+/** Folders on nodes that hold copies (targets for copy rules). */
+function NodeLocations({ nodes }: { nodes: StorageNode[] }) {
+  const qc = useQueryClient()
+  const { toast, confirm } = useUI()
+  const { data } = useQuery({ queryKey: ['admin-node-locations'], queryFn: () => get<{ items: NodeLocation[] }>('/admin/node-locations'), refetchInterval: 5_000 })
+  const [nodeId, setNodeId] = useState<number | ''>('')
+  const [name, setName] = useState('')
+  const [path, setPath] = useState('')
+  const [saving, setSaving] = useState(false)
+  const node = nodes.find((n) => n.id === nodeId)
+  const roots = (node?.storage_roots ?? '').split('\n').filter(Boolean)
+  const refresh = () => qc.invalidateQueries({ queryKey: ['admin-node-locations'] })
+
+  return (
+    <section className="card space-y-4 p-5">
+      <div>
+        <h2 className="font-semibold">Storage on nodes</h2>
+        <p className="text-sm text-slate-500">Folders on nodes that keep copies of files (see Admin &gt; Copies). Copies are encrypted before they leave this server, so the node&apos;s owner cannot read them.</p>
+      </div>
+      {(data?.items ?? []).length > 0 && (
+        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+          {data!.items.map((l) => (
+            <li key={l.id} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">
+                  {l.name} <span className="font-normal text-slate-500">on {l.node_name}</span>
+                </div>
+                <div className="font-mono text-xs text-slate-500">{l.path}</div>
+                {l.error && <div className="text-xs text-rose-600">{l.error}</div>}
+              </div>
+              <Badge tone={l.status === 'ok' ? 'green' : l.status === 'error' ? 'red' : 'amber'}>{l.status}</Badge>
+              <span className="text-xs text-slate-500">{l.disk_total ? `${formatBytes(l.disk_free)} free of ${formatBytes(l.disk_total)}` : ''}</span>
+              {l.status !== 'ok' && (
+                <Button size="sm" variant="ghost" onClick={() => post(`/admin/node-locations/${l.id}/prepare`).then(refresh, (e) => toast('error', errorMessage(e)))}>
+                  Try again
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-rose-600"
+                onClick={async () => {
+                  if (!(await confirm({ title: `Remove ${l.name}?`, message: 'Only possible when no copies are stored there. Files on the node are not deleted.', confirmLabel: 'Remove' }))) return
+                  try {
+                    await del(`/admin/node-locations/${l.id}`)
+                    await refresh()
+                  } catch (e) {
+                    toast('error', errorMessage(e))
+                  }
+                }}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {nodes.length === 0 ? (
+        <p className="text-sm text-slate-500">Approve a node first.</p>
+      ) : (
+        <form
+          className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto] md:items-end"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setSaving(true)
+            try {
+              await post('/admin/node-locations', { node_id: nodeId, name, path })
+              setName('')
+              setPath('')
+              toast('success', 'Location added; the node is preparing the folder')
+              await refresh()
+            } catch (err) {
+              toast('error', errorMessage(err))
+            } finally {
+              setSaving(false)
+            }
+          }}
+        >
+          <Field label="Node">
+            <select
+              className="input"
+              value={nodeId}
+              onChange={(e) => {
+                const id = Number(e.target.value) || ''
+                setNodeId(id)
+                const r = (nodes.find((n) => n.id === id)?.storage_roots ?? '').split('\n').filter(Boolean)
+                if (!path && r[0]) setPath(r[0])
+              }}
+            >
+              <option value="">Choose…</option>
+              {nodes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Name">
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Friend's tank" />
+          </Field>
+          <Field label="Folder on the node" hint={roots.length ? `Allowed: ${roots.join(', ')}` : undefined}>
+            <input className="input font-mono" value={path} onChange={(e) => setPath(e.target.value)} placeholder="/srv/vad-node/storage" />
+          </Field>
+          <Button type="submit" variant="primary" icon={<FolderPlus className="size-4" />} loading={saving} disabled={!nodeId || !name || !path}>
+            Add
+          </Button>
+        </form>
+      )}
+    </section>
   )
 }

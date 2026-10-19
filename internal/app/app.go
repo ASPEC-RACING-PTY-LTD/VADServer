@@ -105,6 +105,8 @@ func (a *App) Run(ctx context.Context) {
 	// Extracted copies of compressed stored files live 10 minutes past
 	// their last use.
 	go a.Blobs.RunExtractSweeper(ctx, time.Minute, storage.ExtractIdle)
+	// File copies (copy rules, storage nodes) and the read fallback.
+	go a.Server.RunCopies(ctx)
 	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	n := 0

@@ -10,6 +10,7 @@ package api
 //	         PATCH /admin/nodes/{id}, DELETE /admin/nodes/{id}
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -159,10 +160,12 @@ func (s *Server) handleNodeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		Hostname: clip(hb.Hostname, 128), ReportedIP: clip(hb.IP, 64), LastIP: s.clientIP(r), Version: clip(hb.Version, 64),
 		PublicURL: clip(hb.PublicURL, 256), LastError: clip(hb.LastError, 500), OS: clip(hb.OS, 16), Arch: clip(hb.Arch, 16), Port: hb.Port,
 		DiskTotal: max(0, hb.DiskTotal), DiskFree: max(0, hb.DiskFree), UptimeSeconds: max(0, hb.UptimeSeconds),
+		TerminalEnabled: hb.TerminalEnabled, StorageRoots: clip(strings.Join(hb.StorageRoots, "\n"), 2000),
 	}, Version); err != nil {
 		writeErr(w, r, err)
 		return
 	}
+	s.syncNodeLocations(r.Context(), n.ID, hb.Locations)
 	resp := nodeapi.HeartbeatResponse{PollInterval: nodeHeartbeatInterval}
 	if (n.AutoUpdate || n.UpdateRequested) && updatableVersion(Version) && hb.Version != Version {
 		if f, ok := s.agentFile(hb.OS, hb.Arch); ok {
@@ -170,6 +173,36 @@ func (s *Server) handleNodeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, resp)
+}
+
+// syncNodeLocations updates the node's locations from its heartbeat. A
+// location the node does not know (reinstalled, data wiped) is prepared again.
+func (s *Server) syncNodeLocations(ctx context.Context, nodeID int64, reported []nodeapi.LocationStatus) {
+	locs, err := s.st.NodeLocations(ctx)
+	if err != nil {
+		return
+	}
+	byID := map[int64]nodeapi.LocationStatus{}
+	for _, l := range reported {
+		byID[l.ID] = l
+	}
+	for _, l := range locs {
+		if l.NodeID != nodeID {
+			continue
+		}
+		rep, ok := byID[l.ID]
+		switch {
+		case ok && rep.OK:
+			_ = s.st.SetNodeLocationStatus(ctx, l.ID, "ok", "", rep.DiskTotal, rep.DiskFree)
+		case ok:
+			_ = s.st.SetNodeLocationStatus(ctx, l.ID, "error", rep.Error, rep.DiskTotal, rep.DiskFree)
+		case l.Status != "preparing":
+			if open, _ := s.st.CountOpenNodeJobs(ctx, nodeID, nodeapi.JobPrepare); open == 0 {
+				_ = s.st.SetNodeLocationStatus(ctx, l.ID, "preparing", "", 0, 0)
+				_, _ = s.enqueueJob(ctx, nodeID, nodeapi.JobPrepare, jobMeta{JobPayload: nodeapi.JobPayload{LocationID: l.ID, Path: l.Path}})
+			}
+		}
+	}
 }
 
 // updatableVersion: development builds never push updates to nodes.

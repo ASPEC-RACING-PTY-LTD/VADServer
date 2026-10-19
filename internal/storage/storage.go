@@ -64,6 +64,8 @@ type Manager struct {
 	// Assign it directly only before the Manager is shared; afterwards use
 	// SetGlobalMinFree (CheckSpace reads it under mu).
 	GlobalMinFree int64
+	// fallback supplies blobs whose primary file is missing (replicas.go).
+	fallback FallbackFunc
 }
 
 func New(st *store.Store) *Manager {
@@ -511,6 +513,19 @@ func (m *Manager) Remove(ctx context.Context, refs []store.BlobRef) {
 // Open opens a blob for reading. Anything other than a regular file (for
 // example a planted symlink) is refused.
 func (m *Manager) Open(locID, userID int64, sha string) (*os.File, error) {
+	f, err := m.openPrimary(locID, userID, sha)
+	if errors.Is(err, os.ErrNotExist) {
+		if fb := m.getFallback(); fb != nil {
+			if f2, ferr := fb(locID, userID, sha); ferr == nil {
+				return f2, nil
+			}
+		}
+	}
+	return f, err
+}
+
+// openPrimary opens the primary file of a blob, without the fallback.
+func (m *Manager) openPrimary(locID, userID int64, sha string) (*os.File, error) {
 	p, err := m.BlobPath(locID, userID, sha)
 	if err != nil {
 		return nil, err

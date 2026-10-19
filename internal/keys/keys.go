@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -396,4 +397,16 @@ func (m *Manager) KEK() (vdcrypt.Key, error) {
 		return vdcrypt.Key{}, ErrUnavailable
 	}
 	return m.kek, nil
+}
+
+// Derive returns a 32-byte key for label derived from the KEK
+// (HMAC-SHA-256), for data the server encrypts with a key that must survive
+// restarts and is backed up with the KEK (copies stored on nodes).
+func (m *Manager) Derive(label string) ([]byte, error) {
+	if m == nil {
+		return nil, ErrUnavailable
+	}
+	mac := hmac.New(sha256.New, m.kek[:])
+	mac.Write([]byte("vaultdock derive v1\x00" + label))
+	return mac.Sum(nil), nil
 }

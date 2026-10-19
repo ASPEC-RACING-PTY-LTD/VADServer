@@ -38,6 +38,8 @@ type StorageNode struct {
 	LastIP          string `json:"last_ip"`
 	LastSeenAt      *int64 `json:"last_seen_at"`
 	LastError       string `json:"last_error"`
+	TerminalEnabled bool   `json:"terminal_enabled"`
+	StorageRoots    string `json:"storage_roots"` // newline separated
 	DecidedBy       *int64 `json:"decided_by"`
 	DecidedAt       *int64 `json:"decided_at"`
 	ExpiresAt       int64  `json:"expires_at"`
@@ -59,14 +61,14 @@ var ErrStorageNodeNotFound = errors.New("storage node not found")
 
 const storageNodeCols = `id, name, status, hostname, reported_ip, request_ip, request_location, os, arch, port, proxy, public_url, version,
 	poll_token_hash, secret_hash, secret_delivered, auto_update, update_requested, disk_total, disk_free, uptime_seconds,
-	last_ip, last_seen_at, last_error, decided_by, decided_at, expires_at, created_at, updated_at`
+	last_ip, last_seen_at, last_error, terminal_enabled, storage_roots, decided_by, decided_at, expires_at, created_at, updated_at`
 
 func scanStorageNode(row interface{ Scan(...any) error }) (*StorageNode, error) {
 	var n StorageNode
 	var seen, by, at sql.NullInt64
 	err := row.Scan(&n.ID, &n.Name, &n.Status, &n.Hostname, &n.ReportedIP, &n.RequestIP, &n.RequestLocation, &n.OS, &n.Arch,
 		&n.Port, &n.Proxy, &n.PublicURL, &n.Version, &n.pollTokenHash, &n.secretHash, &n.SecretDelivered, &n.AutoUpdate,
-		&n.UpdateRequested, &n.DiskTotal, &n.DiskFree, &n.UptimeSeconds, &n.LastIP, &seen, &n.LastError, &by, &at,
+		&n.UpdateRequested, &n.DiskTotal, &n.DiskFree, &n.UptimeSeconds, &n.LastIP, &seen, &n.LastError, &n.TerminalEnabled, &n.StorageRoots, &by, &at,
 		&n.ExpiresAt, &n.CreatedAt, &n.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrStorageNodeNotFound
@@ -156,7 +158,9 @@ func (s *Store) StorageNodeBySecret(ctx context.Context, id int64, secretHash st
 // StorageNodeHeartbeat is what a node reports periodically.
 type StorageNodeHeartbeat struct {
 	Hostname, ReportedIP, LastIP, Version, PublicURL, LastError, OS, Arch string
-	Port, DiskTotal, DiskFree, UptimeSeconds                    int64
+	Port, DiskTotal, DiskFree, UptimeSeconds                              int64
+	TerminalEnabled                                                       bool
+	StorageRoots                                                          string
 }
 
 // RecordStorageNodeHeartbeat stores a heartbeat. A pending "update now" is cleared
@@ -164,11 +168,11 @@ type StorageNodeHeartbeat struct {
 func (s *Store) RecordStorageNodeHeartbeat(ctx context.Context, id int64, h StorageNodeHeartbeat, serverVersion string) error {
 	t := now()
 	_, err := s.DB.ExecContext(ctx, `UPDATE storage_nodes SET hostname = ?, reported_ip = ?, last_ip = ?, version = ?, public_url = ?, last_error = ?,
-		os = COALESCE(NULLIF(?, ''), os), arch = COALESCE(NULLIF(?, ''), arch),
+		os = COALESCE(NULLIF(?, ''), os), arch = COALESCE(NULLIF(?, ''), arch), terminal_enabled = ?, storage_roots = ?,
 		port = ?, disk_total = ?, disk_free = ?, uptime_seconds = ?, last_seen_at = ?, updated_at = ?,
 		update_requested = CASE WHEN ? = ? THEN 0 ELSE update_requested END
 		WHERE id = ?`,
-		h.Hostname, h.ReportedIP, h.LastIP, h.Version, h.PublicURL, h.LastError, h.OS, h.Arch, h.Port, h.DiskTotal, h.DiskFree, h.UptimeSeconds, t, t,
+		h.Hostname, h.ReportedIP, h.LastIP, h.Version, h.PublicURL, h.LastError, h.OS, h.Arch, h.TerminalEnabled, h.StorageRoots, h.Port, h.DiskTotal, h.DiskFree, h.UptimeSeconds, t, t,
 		h.Version, serverVersion, id)
 	return err
 }
