@@ -56,6 +56,9 @@ type Config struct {
 	// (backup-format-v1 §4 "server custody"). Only the path is configured
 	// here; the key is created by the installer, never by Load.
 	KEKFile string
+	// NodeBinaries is the directory with the vad-node agent binaries
+	// (vad-node-linux-amd64, vad-node-linux-arm64) served to storage nodes.
+	NodeBinaries string
 	// AIAllowPrivateEndpoints lets OpenAI-compatible AI endpoints resolve to
 	// loopback, private or link-local addresses (SSRF policy, api-v1 §11).
 	AIAllowPrivateEndpoints bool
@@ -116,6 +119,7 @@ func Load() (*Config, error) {
 		UpdateCheck:    envBool("VAULTDOCK_UPDATE_CHECK", true),
 		UpdateRepo:     env("VAULTDOCK_UPDATE_REPO", "ASPEC-RACING-PTY-LTD/vad-server"),
 		AutoUpdate:     strings.ToLower(env("VAULTDOCK_AUTO_UPDATE", "off")),
+		NodeBinaries:   env("VAULTDOCK_NODE_BINARIES", "/usr/local/share/vaultdock/nodes"),
 
 		AIAllowPrivateEndpoints: envBool("VAULTDOCK_AI_ALLOW_PRIVATE_ENDPOINTS", false),
 	}

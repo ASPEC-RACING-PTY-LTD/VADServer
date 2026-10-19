@@ -747,6 +747,7 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountSuperuser(rt)
 	s.mountPrune(rt)
 	s.mountReplication(rt)
+	s.mountNodesAdmin(rt)
 	s.mountAnalytics(rt)
 	s.mountVersions(rt)
 	s.mountSyncFolders(rt)
@@ -776,6 +777,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 		r.Post("/auth/register", s.handleRegister)
 		r.Post("/device/enroll", s.handleEnroll)
 		r.Get("/device/enroll/{id}", s.handleEnrollStatus)
+		s.mountNodePublic(r) // storage nodes authenticate with their own scheme
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireUser)

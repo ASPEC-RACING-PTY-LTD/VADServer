@@ -30,6 +30,13 @@ ARG TARGETARCH
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-s -w -X github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/api.Version=${VERSION}" -o /out/vaultdock ./cmd/vaultdock \
  && mkdir -p /out/state /out/storage/default
+# Storage node agents (install.sh "Install Node"), served by the server at
+# /api/v1/node/agent/linux/<arch>; same version as the server.
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    for arch in amd64 arm64; do \
+      GOOS=linux GOARCH=$arch go build -ldflags "-s -w -X github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/nodeagent.Version=${VERSION}" \
+        -o /out/nodes/vad-node-linux-$arch ./cmd/vad-node || exit 1; \
+    done
 
 FROM gcr.io/distroless/static-debian12:nonroot
 ARG VERSION=dev
@@ -42,6 +49,7 @@ LABEL org.opencontainers.image.title="VaultDock server" \
 # The licence and third-party notices ship with the binary (BSD/Apache notice terms).
 COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/vaultdock/
 COPY --from=build /out/vaultdock /usr/local/bin/vaultdock
+COPY --from=build /out/nodes /usr/local/share/vaultdock/nodes
 COPY --from=build --chown=65532:65532 /out/state /state
 COPY --from=build --chown=65532:65532 /out/storage /storage
 ENV VAULTDOCK_STATE_DIR=/state \

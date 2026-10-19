@@ -928,4 +928,39 @@ ALTER TABLE restore_items ADD COLUMN target_path TEXT NOT NULL DEFAULT '';
 ALTER TABLE restore_items ADD COLUMN size INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX restore_items_order ON restore_items(restore_id, id);
 `,
+	// 10: storage nodes (vad-node agents on other machines)
+	`
+CREATE TABLE storage_nodes (
+	id               INTEGER PRIMARY KEY,
+	name             TEXT NOT NULL,
+	status           TEXT NOT NULL CHECK (status IN ('pending','approved','rejected','revoked')),
+	hostname         TEXT NOT NULL DEFAULT '',
+	reported_ip      TEXT NOT NULL DEFAULT '',
+	request_ip       TEXT NOT NULL DEFAULT '',
+	request_location TEXT NOT NULL DEFAULT '',
+	os               TEXT NOT NULL DEFAULT '',
+	arch             TEXT NOT NULL DEFAULT '',
+	port             INTEGER NOT NULL DEFAULT 0,
+	proxy            TEXT NOT NULL DEFAULT '',
+	public_url       TEXT NOT NULL DEFAULT '',
+	version          TEXT NOT NULL DEFAULT '',
+	poll_token_hash  TEXT NOT NULL DEFAULT '',
+	secret_hash      TEXT NOT NULL DEFAULT '',
+	secret_delivered INTEGER NOT NULL DEFAULT 0,
+	auto_update      INTEGER NOT NULL DEFAULT 1,
+	update_requested INTEGER NOT NULL DEFAULT 0,
+	disk_total       INTEGER NOT NULL DEFAULT 0,
+	disk_free        INTEGER NOT NULL DEFAULT 0,
+	uptime_seconds   INTEGER NOT NULL DEFAULT 0,
+	last_ip          TEXT NOT NULL DEFAULT '',
+	last_seen_at     INTEGER,
+	last_error       TEXT NOT NULL DEFAULT '',
+	decided_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	decided_at       INTEGER,
+	expires_at       INTEGER NOT NULL,
+	created_at       INTEGER NOT NULL,
+	updated_at       INTEGER NOT NULL
+);
+CREATE INDEX storage_nodes_status ON storage_nodes(status);
+`,
 }

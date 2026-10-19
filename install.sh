@@ -9,6 +9,8 @@
 #   ./install.sh env-review      # add missing settings, review obsolete ones
 #   ./install.sh integrations [cloudflared]   # detect and wire up a Cloudflare Tunnel
 #   ./install.sh kek-status      # where the server key file is and whether it exists
+#   ./install.sh install-node    # storage node agent only (systemd), into ./vad-node
+#   ./install.sh uninstall-node
 #   --approve-env-removal NAME[,NAME]  approve removing obsolete .env settings
 #
 # Environment overrides:
@@ -27,6 +29,9 @@
 #   VAULTDOCK_YES=1    accept defaults for every prompt (non-interactive;
 #                      never approves removing settings)
 #   VAULTDOCK_ENV_APPROVE_REMOVE=A,B  same as --approve-env-removal
+#   VAD_NODE_DIR, VAD_NODE_SERVER_URL, VAD_NODE_NAME, VAD_NODE_PORT,
+#   VAD_NODE_PUBLIC_URL   answers for "Install Node"; VAD_NODE_NO_WAIT=1 skips
+#                      waiting for the admin's approval
 #
 # Only the runtime files are installed (app/: docker-compose.yml, install.sh,
 # deploy/*.json, deploy/integrations/ and .env); the server itself runs from a
@@ -1601,6 +1606,235 @@ EOF
 	esac
 }
 
+# --- storage node agent ----------------------------------------------------------
+# "Install Node" installs only the vad-node agent (no server, no Docker) into
+# ./vad-node below the folder the script runs in, as the systemd service
+# vad-node. The agent binary comes from the server it joins; the server's
+# admin approves the request (Admin > Nodes) and the agent then receives its
+# secret once, stores it encrypted, and takes updates from that server only.
+NODE_SERVICE=vad-node
+NODE_UNIT="/etc/systemd/system/$NODE_SERVICE.service"
+NODE_KEY_DIR=/etc/vad-node
+
+node_dir() { printf '%s' "${VAD_NODE_DIR:-$(pwd -P)/vad-node}"; }
+
+node_arch() {
+	case "$(uname -m)" in
+	x86_64|amd64) echo amd64 ;;
+	aarch64|arm64) echo arm64 ;;
+	*) die "This machine ($(uname -m)) is not supported by the node agent (amd64 and arm64 are)." ;;
+	esac
+}
+
+node_ip() {
+	local ip=""
+	if command -v ip >/dev/null 2>&1; then
+		ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)
+	fi
+	[ -n "$ip" ] || ip=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+	printf '%s' "$ip"
+}
+
+port_in_use() { # port_in_use PORT
+	if command -v ss >/dev/null 2>&1; then
+		[ -n "$(ss -ltnH "sport = :$1" 2>/dev/null)" ]
+	else
+		(exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+	fi
+}
+
+free_port() { # free_port START
+	local p=$1
+	while [ "$p" -lt 65535 ]; do
+		port_in_use "$p" || { printf '%s' "$p"; return; }
+		p=$((p + 1))
+	done
+	die "No free port found from $1 upwards."
+}
+
+# node_download URL DEST HEADERS: downloads a file and saves the response headers.
+node_download() {
+	if command -v curl >/dev/null 2>&1; then curl -fsSL --retry 3 -D "$3" -o "$2" "$1"
+	else wget -q --server-response -O "$2" "$1" 2>"$3"; fi
+}
+
+do_install_node() {
+	[ "$(id -u)" = 0 ] || die "Installing a node needs root (it creates a systemd service). Run it again with sudo or as root."
+	command -v systemctl >/dev/null 2>&1 || die "systemd (systemctl) is required for the node service."
+	command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || die "curl or wget is required."
+	command -v sha256sum >/dev/null 2>&1 || die "sha256sum is required."
+	local ndir; ndir=$(node_dir)
+	case "$ndir" in *[[:space:]]*) die "The node folder must not contain spaces: $ndir (set VAD_NODE_DIR)." ;; esac
+	printf '\n%sInstall a VaultDock storage node%s\n  Folder: %s\n  Only the node agent is installed here (no server files, no Docker).\n\n' "$B" "$N" "$ndir"
+	if [ -f "$ndir/.env" ]; then
+		warn "A node is already installed in $ndir."
+		confirm "Download the current agent from its server and restart it (keeps its settings and approval)?" y || die "Cancelled. Nothing was changed."
+		# shellcheck disable=SC1091
+		local url; url=$(grep -E '^VAD_NODE_SERVER_URL=' "$ndir/.env" | tail -n1 | cut -d= -f2-)
+		node_fetch_agent "$url" "$ndir"
+		systemctl restart "$NODE_SERVICE"
+		ok "Agent updated and restarted."
+		node_wait "$ndir" "$url"
+		return
+	fi
+
+	# 1. Server URL
+	local url=${VAD_NODE_SERVER_URL:-} name port proxy public="" listen ip choice
+	while :; do
+		ask url "Server URL (the VaultDock server this node joins, e.g. https://app.vaultdock.dev)" "$url"
+		url=${url%/}
+		[ -n "$url" ] || { warn "Enter the server's address."; [ "$YES" = 1 ] && die "VAD_NODE_SERVER_URL is required."; continue; }
+		case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
+		if http_get "$url/api/v1/info" 2>/dev/null | grep -q '"name"[[:space:]]*:[[:space:]]*"VaultDock"'; then break; fi
+		warn "$url does not answer as a VaultDock server."
+		[ "$YES" = 1 ] && die "Cannot reach the server at $url."
+	done
+	ok "Server found: $url"
+
+	# 2. Name
+	ask name "Your name for this node (shown to the admin who approves it)" "${VAD_NODE_NAME:-$(hostname)}"
+	[ -n "$name" ] || name=$(hostname)
+
+	# 3. Port
+	printf '  1) Pick a free port automatically\n  2) Choose the port\n'
+	ask choice "Port for the node service" "1"
+	if [ "$choice" = 2 ]; then
+		while :; do
+			ask port "Port" "${VAD_NODE_PORT:-7480}"
+			[[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || { warn "Enter a number from 1 to 65535."; continue; }
+			port_in_use "$port" && { warn "Port $port is in use."; [ "$YES" = 1 ] && die "Port $port is in use."; continue; }
+			break
+		done
+	else
+		port=$(free_port "${VAD_NODE_PORT:-7480}")
+	fi
+	ok "Port: $port"
+
+	# 4. Reverse proxy / tunnel
+	printf '  1) None (reached directly on this machine'"'"'s address)\n  2) Cloudflare Tunnel (cloudflared)\n  3) Nginx\n  4) Caddy\n  5) Another reverse proxy\n'
+	ask choice "How is this node reached" "1"
+	case "$choice" in 2) proxy=cloudflared ;; 3) proxy=nginx ;; 4) proxy=caddy ;; 5) proxy=other ;; *) proxy=none ;; esac
+	ip=$(node_ip)
+	if [ "$proxy" != none ]; then
+		ask public "Public URL of this node through $proxy (point it at http://${ip:-this-machine}:$port; empty if not set up yet)" "${VAD_NODE_PUBLIC_URL:-}"
+		public=${public%/}
+	fi
+	listen="0.0.0.0:$port"
+
+	# 5. Agent from the server
+	mkdir -p -- "$ndir/bin" "$ndir/data"
+	chmod 700 -- "$ndir/data"
+	node_fetch_agent "$url" "$ndir"
+
+	# 6. .env
+	umask 077
+	cat >"$ndir/.env" <<EOF
+# VaultDock storage node, written by install.sh ("Install Node").
+# Change a value, then: systemctl restart $NODE_SERVICE
+VAD_NODE_SERVER_URL=$url
+VAD_NODE_NAME=$name
+VAD_NODE_PORT=$port
+VAD_NODE_LISTEN=$listen
+VAD_NODE_PROXY=$proxy
+VAD_NODE_PUBLIC_URL=$public
+VAD_NODE_IP=$ip
+VAD_NODE_KEY_FILE=$NODE_KEY_DIR/node.key
+EOF
+	umask 027
+	ok "Configuration written to $ndir/.env"
+
+	# 7. systemd service
+	mkdir -p -- "$NODE_KEY_DIR"
+	chmod 700 -- "$NODE_KEY_DIR"
+	cat >"$NODE_UNIT" <<EOF
+[Unit]
+Description=VaultDock storage node agent
+Documentation=https://github.com/$DEFAULT_REPO
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$ndir
+ExecStart=$ndir/bin/vad-node run --dir $ndir
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=$ndir $NODE_KEY_DIR
+
+[Install]
+WantedBy=multi-user.target
+EOF
+	systemctl daemon-reload
+	systemctl enable "$NODE_SERVICE" >/dev/null 2>&1
+	systemctl restart "$NODE_SERVICE"
+	ok "Service $NODE_SERVICE enabled and started (survives restarts)."
+
+	# 8. Join request and approval
+	node_wait "$ndir" "$url"
+}
+
+# node_fetch_agent URL DIR: downloads the agent for this machine from the
+# server and checks it against the server's SHA-256.
+node_fetch_agent() {
+	local url=$1 ndir=$2 arch tmp hdr want got
+	arch=$(node_arch)
+	tmp=$(mktemp "$ndir/bin/.vad-node.XXXXXX")
+	hdr=$(mktemp)
+	info "Downloading the node agent (linux/$arch) from $url"
+	node_download "$url/api/v1/node/agent/linux/$arch" "$tmp" "$hdr" || { rm -f -- "$tmp" "$hdr"; die "The server has no node agent for linux/$arch (is it up to date?)."; }
+	want=$(tr -d '\r' <"$hdr" | grep -i 'x-content-sha256:' | tail -n1 | awk '{print tolower($NF)}')
+	rm -f -- "$hdr"
+	got=$(sha256sum "$tmp" | awk '{print $1}')
+	[ -n "$want" ] && [ "$want" = "$got" ] || { rm -f -- "$tmp"; die "The downloaded agent does not match the server's checksum."; }
+	chmod 755 -- "$tmp"
+	mv -f -- "$tmp" "$ndir/bin/vad-node"
+	ok "Agent $("$ndir/bin/vad-node" version) installed in $ndir/bin"
+}
+
+# node_wait DIR URL: waits until an admin approves the node (or it fails).
+node_wait() {
+	local ndir=$1 url=$2 out rc shown=0 deadline
+	if [ "${VAD_NODE_NO_WAIT:-0}" = 1 ]; then info "Not waiting for approval (VAD_NODE_NO_WAIT=1). Check later: $ndir/bin/vad-node status"; return; fi
+	deadline=$(( $(date +%s) + 65 * 60 ))
+	while [ "$(date +%s)" -lt "$deadline" ]; do
+		rc=0; out=$("$ndir/bin/vad-node" status --dir "$ndir" 2>&1) || rc=$?
+		case "$rc:$out" in
+		0:*) ok "Approved. This node is connected to $url."; printf '  Status: %s/bin/vad-node status    Logs: journalctl -u %s -f\n' "$ndir" "$NODE_SERVICE"; return ;;
+		2:pending*)
+			if [ "$shown" = 0 ]; then
+				info "Join request sent. An admin must approve it in ${B}$url/admin/nodes${N} within 1 hour"
+				printf '  It shows this node as "%s" from %s, requested %s.\n  Waiting (Ctrl+C stops waiting; the service keeps waiting in the background)...\n' \
+					"$(grep -E '^VAD_NODE_NAME=' "$ndir/.env" | cut -d= -f2-)" "$(grep -E '^VAD_NODE_IP=' "$ndir/.env" | cut -d= -f2-)" "$(date '+%Y-%m-%d %H:%M')"
+				shown=1
+			fi ;;
+		3:*) warn "${out}"; die "The node was not approved. See: journalctl -u $NODE_SERVICE" ;;
+		esac
+		sleep 3
+	done
+	warn "Still not approved. The service keeps asking; check with $ndir/bin/vad-node status"
+}
+
+do_uninstall_node() {
+	[ "$(id -u)" = 0 ] || die "Removing the node needs root."
+	local ndir; ndir=$(node_dir)
+	if [ -f "$NODE_UNIT" ]; then
+		ndir=$(sed -n 's/^WorkingDirectory=//p' "$NODE_UNIT" | head -n1)
+	fi
+	[ -f "$NODE_UNIT" ] || [ -d "$ndir" ] || die "No node installed (no $NODE_UNIT and no $ndir)."
+	confirm "Stop and remove the $NODE_SERVICE service?" n || die "Cancelled."
+	systemctl disable --now "$NODE_SERVICE" >/dev/null 2>&1 || true
+	rm -f -- "$NODE_UNIT"
+	systemctl daemon-reload
+	ok "Service removed. Revoke or delete the node in the server's Admin > Nodes too."
+	if [ -n "$ndir" ] && [ -d "$ndir" ] && confirm "Also delete $ndir and its key in $NODE_KEY_DIR?" n; then
+		rm -rf -- "$ndir" "$NODE_KEY_DIR"
+		ok "Node files removed."
+	fi
+}
+
 do_status() {
 	if installed; then
 		info "Installed in $DIR (version $(env_get VAULTDOCK_VERSION), configuration $ENV_FILE)"
@@ -1613,7 +1847,7 @@ do_status() {
 menu() {
 	printf '\n%sVaultDock installer%s  (install directory: %s)\n' "$B" "$N" "$DIR"
 	if installed; then printf '  Existing installation detected.\n'; fi
-	printf '  1) Install / Replace\n  2) Upgrade\n  3) Integrations (Cloudflare Tunnel)\n  4) Environment review\n  5) Automatic updates\n  6) Uninstall\n  7) Server key status\n  q) Quit\n'
+	printf '  1) Install / Replace\n  2) Upgrade\n  3) Integrations (Cloudflare Tunnel)\n  4) Environment review\n  5) Automatic updates\n  6) Uninstall\n  7) Server key status\n  8) Install Node (storage node agent only, into ./vad-node)\n  9) Uninstall Node\n  q) Quit\n'
 	local choice; ask choice "Choose an option" "q"
 	case "$choice" in
 	1) do_install ;;
@@ -1627,6 +1861,8 @@ menu() {
 		;;
 	6) do_uninstall ;;
 	7) do_kek_status ;;
+	8) do_install_node ;;
+	9) do_uninstall_node ;;
 	*) echo "Bye." ;;
 	esac
 }
@@ -1652,9 +1888,11 @@ main() {
 	env-review) do_env_review ;;
 	integrations) do_integrations "${2:-}" ;;
 	kek-status) do_kek_status ;;
+	install-node) do_install_node ;;
+	uninstall-node) do_uninstall_node ;;
 	""|--yes) menu ;;
 	-h|--help) sed -n '2,/^set -Eeuo/p' "$0" | sed '$d' ;;
-	*) die "Unknown command: $cmd (use install, upgrade, uninstall, status, auto-update, env-review, integrations or kek-status)" ;;
+	*) die "Unknown command: $cmd (use install, upgrade, uninstall, status, auto-update, env-review, integrations, kek-status, install-node or uninstall-node)" ;;
 	esac
 }
 
