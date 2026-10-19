@@ -1,6 +1,6 @@
 # Deployment
 
-VaultDock runs as a single container (`vaultdock`). `install.sh` installs only what the server needs to run: the release's prebuilt image (or an image built from a temporary copy of the source, which is deleted afterwards) and a small `app/` folder. This page explains what it configures so you can adapt it.
+VaultDock runs as a single container (`vaultdock`). `install.sh` installs only what the server needs to run: the released image `ghcr.io/aspec-racing-pty-ltd/vad-server:latest` (`:dev` on the development channel; before the first release, an image built from a temporary copy of the source, which is deleted afterwards) and a small `app/` folder. This page explains what it configures so you can adapt it.
 
 ## Requirements
 
@@ -111,6 +111,7 @@ Restore: stop VaultDock, copy `vaultdock.db` into the state directory (delete st
 ```bash
 cp .env.example .env    # edit it
 mkdir -p data/state data/storage && sudo chown -R 65532:65532 data
-docker compose up -d --build
+docker compose pull     # ghcr.io/aspec-racing-pty-ltd/vad-server:latest
+docker compose up -d
 docker compose logs -f
 ```

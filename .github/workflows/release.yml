@@ -1,94 +1,107 @@
 name: Release
 
-# Push a tag such as v1.2.0 to publish a server release:
-#   - ghcr.io/aspec-racing-pty-ltd/vad-server:<version> (+ :latest for
-#     non-prerelease tags), linux/amd64 + linux/arm64, with OCI labels;
-#   - a GitHub release of ASPEC-RACING-PTY-LTD/vad-server carrying install.sh,
-#     docker-compose.yml, env.example, deploy.tar.gz and SHA256SUMS.
-# `install.sh upgrade` picks it up from here.
+# A push to main releases only when one of the pushed commit messages contains
+#   DEPLOY: Production   -> next version (scripts/release-version.sh), tag vX.Y.Z,
+#                           images :X.Y.Z and :latest, a normal GitHub release
+#   DEPLOY: Development  -> the current production version, tag vX.Y.Z-dev,
+#                           images :X.Y.Z-dev and :dev, a pre-release that is
+#                           replaced on every development release
+# Any other push builds nothing here (CI still runs). Images are
+# linux/amd64 + linux/arm64 at ghcr.io/aspec-racing-pty-ltd/vad-server;
+# install.sh always pulls :latest (or :dev with VAULTDOCK_CHANNEL=development).
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to (re)build, for example v1.2.0
+      channel:
+        description: Release channel for the current main commit
+        type: choice
+        options: [production, development]
         required: true
 
+# One release at a time, so two runs never pick the same version.
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
+  group: release
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 env:
-  TAG: ${{ inputs.tag || github.ref_name }}
   IMAGE: ghcr.io/aspec-racing-pty-ltd/vad-server
-  SDK_MODULE: github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk
 
 jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      # Commit messages go through the environment, never into the script text.
+      - name: Channel
+        id: channel
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ inputs.channel }}
+          MESSAGES: ${{ join(github.event.commits.*.message, ' | ') }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then ch=$INPUT
+          elif grep -qF 'DEPLOY: Production' <<<"$MESSAGES"; then ch=production
+          elif grep -qF 'DEPLOY: Development' <<<"$MESSAGES"; then ch=development
+          else ch=""; fi
+          echo "channel=$ch" >> "$GITHUB_OUTPUT"
+          if [ -z "$ch" ]; then echo "No DEPLOY: line in the pushed commits; nothing to release." >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/checkout@v5
+        if: steps.channel.outputs.channel != ''
+        with:
+          fetch-depth: 0
+      - name: Version
+        id: v
+        if: steps.channel.outputs.channel != ''
+        env:
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+        run: |
+          bash scripts/release-version.sh "$CHANNEL" | tee -a "$GITHUB_OUTPUT"
+          echo "Releasing $CHANNEL $(grep '^version=' "$GITHUB_OUTPUT" | tail -n1 | cut -d= -f2) from ${GITHUB_SHA::7}" >> "$GITHUB_STEP_SUMMARY"
+
   server-image:
     name: Server image (amd64 + arm64)
+    needs: plan
+    if: needs.plan.outputs.channel != ''
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
       packages: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      CHANNEL: ${{ needs.plan.outputs.channel }}
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.TAG }}
-          path: vad-server
-      - name: Version
-        id: v
+      # The SDK is vendored in ./sdk (go.mod replace), so the build needs no
+      # other repository. A tag is simply moved when it is pushed again.
+      - name: Image tags
+        id: tags
         run: |
-          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$ ]] || { echo "::error::$TAG is not a vMAJOR.MINOR.PATCH tag"; exit 1; }
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          if [[ "$TAG" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
-      # Until sdk/v0.1.0 is published, go.mod replaces the SDK with ../VaultDock/sdk
-      # and the image is built with that sibling checkout as the `sdk` build
-      # context. Without the replace, the Dockerfile fetches the SDK from the
-      # module proxy and no sibling is used.
-      #   vars.VAULTDOCK_SDK_REF      VaultDock ref to build against (pin a tag for releases; default main)
-      #   secrets.VAULTDOCK_SDK_TOKEN read token for VaultDock if it is private
-      - name: Detect local SDK replace
-        id: sdk
-        working-directory: vad-server
-        run: |
-          if grep -Eq "^replace[[:space:]]+${SDK_MODULE}[[:space:]]+=>[[:space:]]+\.\./VaultDock/sdk" go.mod; then
-            echo "local=true" >> "$GITHUB_OUTPUT"
-            echo "context=sdk=${GITHUB_WORKSPACE}/VaultDock/sdk" >> "$GITHUB_OUTPUT"
-          else
-            echo "local=false" >> "$GITHUB_OUTPUT"
-            echo "context=" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/checkout@v5
-        if: steps.sdk.outputs.local == 'true'
-        with:
-          repository: ASPEC-RACING-PTY-LTD/vad-client
-          ref: ${{ vars.VAULTDOCK_SDK_REF || 'main' }}
-          token: ${{ secrets.VAULTDOCK_SDK_TOKEN || github.token }}
-          path: VaultDock
-          sparse-checkout: sdk
-      - name: SDK revision
-        if: steps.sdk.outputs.local == 'true'
-        run: echo "Building against VaultDock $(git -C VaultDock rev-parse HEAD) (sdk/ via local replace)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$CHANNEL" = production ]; then moving=latest; else moving=dev; fi
+          { echo "tags<<EOF"; echo "$IMAGE:$VERSION"; echo "$IMAGE:$moving"; echo EOF; } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        env:
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+      # Build stages cross-compile natively (see Dockerfile), so arm64 needs no emulation.
+      - uses: docker/build-push-action@v6
         with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=raw,value=${{ steps.v.outputs.version }}
-            type=raw,value=latest,enable=${{ steps.v.outputs.prerelease == 'false' }}
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.title=VaultDock server
             org.opencontainers.image.description=Self-hosted file storage and intelligent synchronisation
@@ -96,41 +109,35 @@ jobs:
             org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
             org.opencontainers.image.source=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
             org.opencontainers.image.url=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
-            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
           annotations: |
-            org.opencontainers.image.title=VaultDock server
-            org.opencontainers.image.description=Self-hosted file storage and intelligent synchronisation
-            org.opencontainers.image.vendor=ASPEC Racing Pty Ltd
-            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
-            org.opencontainers.image.source=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
-            org.opencontainers.image.url=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
-            org.opencontainers.image.version=${{ steps.v.outputs.version }}
-      # Build stages cross-compile natively (see Dockerfile), so arm64 needs no emulation.
-      - uses: docker/build-push-action@v6
-        with:
-          context: vad-server
-          build-contexts: ${{ steps.sdk.outputs.context }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-          build-args: VERSION=${{ steps.v.outputs.version }}
+            index:org.opencontainers.image.description=Self-hosted file storage and intelligent synchronisation
+            index:org.opencontainers.image.source=https://github.com/ASPEC-RACING-PTY-LTD/vad-server
+            index:org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+            index:org.opencontainers.image.version=${{ env.VERSION }}
+          build-args: VERSION=${{ env.VERSION }}
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,scope=server-image,mode=max
           provenance: false
+      - name: Summary
+        run: printf 'Pushed `%s:%s` (%s)\n' "$IMAGE" "$VERSION" "$CHANNEL" >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     name: Publish release
-    needs: [server-image]
+    needs: [plan, server-image]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      CHANNEL: ${{ needs.plan.outputs.channel }}
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.TAG }}
       # GitHub renames release assets that start with a dot, so .env.example is
       # published as env.example. deploy.tar.gz unpacks to deploy/…; it is
       # built reproducibly (sorted, fixed owner and commit timestamp).
@@ -142,19 +149,23 @@ jobs:
           ts=$(git log -1 --format=%ct)
           tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$ts" \
               --format=gnu -cf - deploy | gzip -n9 > assets/deploy.tar.gz
-          tar -tzf assets/deploy.tar.gz
           cd assets && sha256sum -- install.sh docker-compose.yml env.example deploy.tar.gz > SHA256SUMS && cat SHA256SUMS
-      - name: Create or update the GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ASPEC-RACING-PTY-LTD/vad-server
+      # A development release always replaces the previous one at the same
+      # tag (release and tag are deleted, then created on this commit).
+      - name: Create the GitHub release
         run: |
-          flags=()
-          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
-          notes="Image: \`${IMAGE}:${TAG#v}\` (linux/amd64, linux/arm64)."
+          if [ "$CHANNEL" = development ] && gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --cleanup-tag --yes
+            for _ in 1 2 3 4 5 6; do git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || break; sleep 5; done
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" assets/* --clobber
+            exit 0
+          fi
+          if [ "$CHANNEL" = production ]; then
+            gh release create "$TAG" assets/* --target "$GITHUB_SHA" --title "VaultDock server $VERSION" --latest \
+              --generate-notes --notes "Image: \`$IMAGE:latest\` (also \`$IMAGE:$VERSION\`), linux/amd64 and linux/arm64."
           else
-            gh release create "$TAG" assets/* --verify-tag --generate-notes --notes "$notes" \
-              --title "VaultDock server ${TAG#v}" "${flags[@]}"
+            gh release create "$TAG" assets/* --target "$GITHUB_SHA" --title "VaultDock server $VERSION (development)" --prerelease --latest=false \
+              --notes "Development build of ${GITHUB_SHA::7}. Image: \`$IMAGE:dev\` (also \`$IMAGE:$VERSION\`). Replaced by the next development release."
           fi

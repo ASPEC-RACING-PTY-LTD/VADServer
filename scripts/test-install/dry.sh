@@ -7,7 +7,7 @@
 # Each scenario runs in its own subshell with its own VAULTDOCK_DIR.
 #
 #   bash scripts/test-install/dry.sh [scenario...]
-#   scenarios: sync fresh upgrade legacy-caddy modified obsolete kek cloudflared
+#   scenarios: sync fresh upgrade legacy-caddy modified obsolete kek cloudflared versions image-switch
 set -u
 
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
@@ -61,10 +61,9 @@ sc_sync() {
 	check "MANAGED_KEYS matches the schema's managed variables" [ "$a" = "$b" ]
 	check "schema has VAULTDOCK_TUNNEL_NETWORK" grep -q '"VAULTDOCK_TUNNEL_NETWORK"' "$ROOT/$ENV_SCHEMA_REL"
 	check "default repository is vad-server" [ "$REPO" = ASPEC-RACING-PTY-LTD/vad-server ]
-	VAULTDOCK_SOURCE="" RELEASE_VERSION=1.2.3
-	local_source() { :; }
-	check "release image is ghcr.io/aspec-racing-pty-ltd/vad-server" [ "$(release_image)" = ghcr.io/aspec-racing-pty-ltd/vad-server:1.2.3 ]
-	check "legacy image fallback is ghcr.io/aspec-racing-pty-ltd/vaultdock" [ "$(legacy_release_image)" = ghcr.io/aspec-racing-pty-ltd/vaultdock:1.2.3 ]
+	check "production follows ghcr.io/aspec-racing-pty-ltd/vad-server:latest" [ "$(registry_image)" = ghcr.io/aspec-racing-pty-ltd/vad-server:latest ]
+	check "development follows :dev" [ "$(VAULTDOCK_CHANNEL=development registry_image)" = ghcr.io/aspec-racing-pty-ltd/vad-server:dev ]
+	check "shipped compose has no build: section" sh -c "! grep -q '^    build:' '$ROOT/docker-compose.yml'"
 	check "integration_file maps cloudflared-net to cloudflared/" [ "$(integration_file cloudflared-net)" = "$APP/deploy/integrations/cloudflared/compose.cloudflared-net.yml" ]
 	check "detect.sh runs read-only and reports a count" sh -c "sh '$ROOT/$CF_DETECT_REL' 3000 | grep -q '^count='"
 }
@@ -302,7 +301,72 @@ EOF
 	check "VAULTDOCK_TUNNEL_NETWORK set" [ "$(envval VAULTDOCK_TUNNEL_NETWORK)" = cf_tunnel ]
 }
 
-ALL="sync fresh upgrade legacy-caddy modified obsolete kek cloudflared"
+# Release numbering (scripts/release-version.sh) in a throw-away repository.
+sc_versions() {
+	local rv="$ROOT/scripts/release-version.sh" r="$WORK/versions"
+	check "0.0.1 -> 0.0.2" [ "$(bash "$rv" bump 0.0.1)" = 0.0.2 ]
+	check "0.0.9 -> 0.1.0" [ "$(bash "$rv" bump 0.0.9)" = 0.1.0 ]
+	check "0.1.9 -> 0.2.0" [ "$(bash "$rv" bump 0.1.9)" = 0.2.0 ]
+	check "0.9.9 -> 1.0.0" [ "$(bash "$rv" bump 0.9.9)" = 1.0.0 ]
+	check "1.0.0 -> 1.0.1" [ "$(bash "$rv" bump 1.0.0)" = 1.0.1 ]
+	command -v git >/dev/null 2>&1 || { pass "git missing; tag scenarios skipped"; return 0; }
+	mkdir -p "$r" && cd "$r" || return 1
+	g() { git -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false "$@" >/dev/null 2>&1; }
+	g init -q; g commit -q --allow-empty -m one
+	check "first production release is 0.1.0" [ "$(bash "$rv" production | grep ^version=)" = version=0.1.0 ]
+	check "development before any production is 0.0.0-dev" [ "$(bash "$rv" development | grep ^tag=)" = tag=v0.0.0-dev ]
+	g tag v0.1.0
+	check "re-running production on a tagged commit reuses 0.1.0" [ "$(bash "$rv" production | grep ^version=)" = version=0.1.0 ]
+	local i; for i in 1 2 3 4 5 6 7 8 9 10; do g commit -q --allow-empty -m "c$i"; done
+	check "commits do not raise the version (next is 0.1.1)" [ "$(bash "$rv" production | grep ^version=)" = version=0.1.1 ]
+	check "development stays at the production version" [ "$(bash "$rv" development)" = "$(printf 'version=0.1.0-dev
+tag=v0.1.0-dev')" ]
+	g tag v0.1.0-dev; g tag v0.0.9 HEAD~5
+	check "-dev and older tags do not count" [ "$(bash "$rv" production | grep ^version=)" = version=0.1.1 ]
+}
+
+# A modified docker-compose.yml from a source-build install is switched to the
+# released image; a clean source checkout linked to the install is removed.
+sc_image_switch() {
+	load switch
+	fresh_install switch
+	cp -- "$FIX/legacy-docker-compose.yml" "$APP/docker-compose.yml"
+	printf '    labels:
+      - mine
+' >>"$APP/docker-compose.yml"
+	compose_drop_build >/dev/null 2>&1
+	check "build: section removed" sh -c "! grep -q '^    build:' '$APP/docker-compose.yml'"
+	check "other changes kept" grep -q -- '- mine' "$APP/docker-compose.yml"
+	check "the image comes from VAULTDOCK_IMAGE" grep -q 'image: ${VAULTDOCK_IMAGE' "$APP/docker-compose.yml"
+	command -v git >/dev/null 2>&1 || { pass "git missing; checkout scenarios skipped"; return 0; }
+	local co="$WORK/vad-server" dirty="$WORK/vad-dirty"
+	g() { git -c user.name=t -c user.email=t@t -c commit.gpgsign=false "$@" >/dev/null 2>&1; }
+	for d in "$co" "$dirty"; do
+		mkdir -p "$d/internal" && cp -- "$ROOT/Dockerfile" "$ROOT/docker-compose.yml" "$ROOT/go.mod" "$d/" && echo x >"$d/internal/a.go"
+		g -C "$d" init -q && g -C "$d" add -A && g -C "$d" commit -q -m src
+		ln -sfn -- "$ENV_FILE" "$d/.env" 2>/dev/null
+	done
+	echo keep >"$co/my-notes.txt"
+	echo change >>"$dirty/go.mod"
+	SCRIPT_DIR=""
+	if [ -L "$co/.env" ]; then
+		check "linked checkouts found" [ "$(source_checkouts | wc -l | tr -d ' ')" = 2 ]
+	else
+		pass "symlinks unavailable here; linked-checkout detection skipped"
+	fi
+	# No upstream: rev-list fails, so treat both as unpushed first.
+	remove_checkout "$co" >/dev/null 2>&1
+	check "checkout without upstream kept" [ -f "$co/Dockerfile" ]
+	g init -q --bare "$WORK/remote.git" && g -C "$co" remote add origin "$WORK/remote.git" && g -C "$co" push -q -u origin HEAD
+	remove_checkout "$co" >/dev/null 2>&1
+	check "clean pushed checkout: tracked files removed" sh -c "[ ! -e '$co/Dockerfile' ] && [ ! -e '$co/internal' ] && [ ! -e '$co/.git' ]"
+	check "clean pushed checkout: untracked file kept" [ -f "$co/my-notes.txt" ]
+	remove_checkout "$dirty" >/dev/null 2>&1
+	check "checkout with local changes kept" [ -f "$dirty/Dockerfile" ]
+	check "installation untouched" [ -f "$ENV_FILE" ]
+}
+
+ALL="sync fresh upgrade legacy-caddy modified obsolete kek cloudflared versions image-switch"
 for s in ${*:-$ALL}; do
 	printf '== %s\n' "$s"
 	if ! ( "sc_${s//-/_}" ); then fail "scenario $s stopped early"; fi

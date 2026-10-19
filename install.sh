@@ -18,11 +18,12 @@
 #   VAULTDOCK_REPO     GitHub "owner/name" to download from
 #                      (default ASPEC-RACING-PTY-LTD/vad-server; the server was
 #                      published from ASPEC-RACING-PTY-LTD/vad-client before)
-#   VAULTDOCK_REF      branch or tag to install (default: the latest release,
-#                      or main when no release has been published)
-#   VAULTDOCK_SOURCE   use this local source directory instead of downloading
-#   VAULTDOCK_IMAGE    pull this prebuilt image instead of building locally
-#                      (releases use ghcr.io/<repo>:<version> automatically)
+#   VAULTDOCK_CHANNEL  production (default) or development; also kept in .env.
+#                      Production runs ghcr.io/<repo>:latest, development :dev.
+#   VAULTDOCK_REF      branch or tag of the runtime files (default: the latest
+#                      release of the channel, or main when none is published)
+#   VAULTDOCK_SOURCE   build from this local source directory instead
+#   VAULTDOCK_IMAGE    pull this image instead of the channel's released image
 #   VAULTDOCK_HTTPS    tunnel | caddy | selfsigned | none (skips the question)
 #   VAULTDOCK_PORT, VAULTDOCK_PUBLIC_URL, VAULTDOCK_STORAGE   answers for unattended installs
 #   VAULTDOCK_REBUILD=0  reuse an existing local vaultdock:local image
@@ -36,7 +37,11 @@
 #
 # Only the runtime files are installed (app/: docker-compose.yml, install.sh,
 # deploy/*.json, deploy/integrations/ and .env); the server itself runs from a
-# container image. Reverse proxies and tunnels are opt-in integrations
+# container image. Once a release is published every install and upgrade pulls
+# the channel's released image (:latest or :dev, never a pinned version); an
+# installation that was built from source is switched over on its next upgrade
+# and the local build and source checkout are removed. Without a release the
+# image is built from the main branch. Reverse proxies and tunnels are opt-in integrations
 # (VAULTDOCK_INTEGRATIONS); none runs by default.
 #
 # Upgrades never change existing .env values: missing settings are appended
@@ -52,12 +57,13 @@ umask 027
 
 DEFAULT_REPO="ASPEC-RACING-PTY-LTD/vad-server"
 # Where releases were published before the server moved to its own repository
-# (C21). Its images (ghcr.io/aspec-racing-pty-ltd/vaultdock) stay usable.
+# (C21); only used to point out an outdated VAULTDOCK_UPDATE_REPO.
 LEGACY_REPO="ASPEC-RACING-PTY-LTD/VaultDock"
 REPO="${VAULTDOCK_REPO:-$DEFAULT_REPO}"
 REF="${VAULTDOCK_REF:-}"
 IF_NEWER=0
 RELEASE_VERSION=""
+PREFER_RELEASE=0
 YES="${VAULTDOCK_YES:-0}"
 PROJECT="vaultdock"
 
@@ -156,6 +162,7 @@ is_repo() { [ -n "${1:-}" ] && [ -f "$1/Dockerfile" ] && [ -f "$1/docker-compose
 # downloads the new release instead of reinstalling itself.
 local_source() {
 	if [ -n "${VAULTDOCK_SOURCE:-}" ]; then printf '%s' "$VAULTDOCK_SOURCE"; return; fi
+	[ "$PREFER_RELEASE" = 0 ] || return 0
 	is_repo "$SCRIPT_DIR" || return 0
 	local app_real; app_real=$(cd -- "$APP" 2>/dev/null && pwd -P || true)
 	[ "$SCRIPT_DIR" = "$app_real" ] || [ "$SCRIPT_DIR" = "$(cd -- "$APP.old" 2>/dev/null && pwd -P || true)" ] || printf '%s' "$SCRIPT_DIR"
@@ -166,11 +173,43 @@ http_get() { # http_get URL -> stdout
 	else wget -qO- --header='Accept: application/vnd.github+json' "$1"; fi
 }
 
-# latest_release prints the tag of the latest published release, or nothing.
+# channel prints the release channel: production (default) or development.
+channel() {
+	local c=${VAULTDOCK_CHANNEL:-}
+	[ -n "$c" ] || c=$(env_get VAULTDOCK_CHANNEL)
+	case "$c" in dev | development) echo development ;; *) echo production ;; esac
+}
+
+# registry_image prints the released image of the channel. Installs always
+# follow the moving tag (:latest or :dev); a version is never pinned.
+registry_image() {
+	local tag=latest
+	[ "$(channel)" = production ] || tag=dev
+	printf 'ghcr.io/%s:%s' "$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')" "$tag"
+}
+
+# latest_release prints the tag of the channel's latest release (vX.Y.Z, or
+# vX.Y.Z-dev for development), or nothing.
 latest_release() {
 	[ -n "$REPO" ] || return 0
-	http_get "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
-		grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"\([^"]*\)"$/\1/' || true
+	if [ "$(channel)" = production ]; then
+		http_get "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
+			grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"\([^"]*\)"$/\1/' || true
+	else
+		http_get "https://api.github.com/repos/$REPO/releases?per_page=30" 2>/dev/null |
+			grep -o '"tag_name"[[:space:]]*:[[:space:]]*"v[^"]*-dev"' | head -n1 | sed 's/.*"\([^"]*\)"$/\1/' || true
+	fi
+}
+
+# prefer_release: run from a source checkout, install.sh still uses the
+# published release (and its image) once one exists; VAULTDOCK_SOURCE forces
+# a source build. The checkout is removed after a successful switch.
+prefer_release() {
+	[ -z "${VAULTDOCK_SOURCE:-}" ] && [ -n "$(local_source)" ] || return 0
+	local tag; tag=$(latest_release)
+	[ -n "$tag" ] || return 0
+	PREFER_RELEASE=1
+	info "Release $tag is published; using the released image instead of building $SCRIPT_DIR."
 }
 
 # resolve_ref picks what to install: VAULTDOCK_REF, else the latest release,
@@ -285,49 +324,28 @@ docker_build() { # docker_build VERSION SRC
 	DOCKER_BUILDKIT=1 docker build -t vaultdock:local --build-arg "VERSION=$1" "$2"
 }
 
-# build_image: a registry image (VAULTDOCK_IMAGE) is reused or pulled, falling
-# back to a source build if it cannot be pulled. Otherwise the image is built
-# from source; VAULTDOCK_REBUILD=0 reuses an existing local build.
-release_image() { # the prebuilt image published for RELEASE_VERSION, if any
-	if [ -n "$RELEASE_VERSION" ] && [ -z "$(local_source)" ]; then
-		printf 'ghcr.io/%s:%s' "$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')" "$RELEASE_VERSION"
-	else
-		printf 'vaultdock:local'
-	fi
-}
-
-# legacy_release_image prints the image the same release had under the former
-# repository name (ghcr.io/aspec-racing-pty-ltd/vaultdock), tried when the
-# vad-server image cannot be pulled during the transition (C21).
-legacy_release_image() {
-	[ -z "${VAULTDOCK_IMAGE:-}" ] && [ -n "$RELEASE_VERSION" ] && [ -z "$(local_source)" ] && [ "$REPO" = "$DEFAULT_REPO" ] || return 0
-	printf 'ghcr.io/%s:%s' "$(printf '%s' "$LEGACY_REPO" | tr '[:upper:]' '[:lower:]')" "$RELEASE_VERSION"
-}
-
-# build_image only pulls or builds when the target image is not present yet:
-# an upgrade to the version already installed reuses the image, and
-# "docker compose up -d" then recreates only services whose image or
-# configuration changed. Volumes and bind mounts are never touched.
+# build_image pulls the channel's released image (VAULTDOCK_IMAGE overrides
+# it) every time, so an upgrade always gets the newest build of :latest or
+# :dev. Without a published release, or when the pull fails, the image is built
+# from source; VAULTDOCK_REBUILD=0 reuses an existing local build. "docker
+# compose up -d" then recreates only services whose image or configuration
+# changed. Volumes and bind mounts are never touched.
 build_image() {
-	local img=${VAULTDOCK_IMAGE:-$(release_image)} cand
-	[ -z "$RELEASE_VERSION" ] || env_set_managed VAULTDOCK_VERSION "$RELEASE_VERSION"
-	if [ "$img" != "vaultdock:local" ]; then
-		for cand in "$img" $(legacy_release_image); do
-			if docker image inspect "$cand" >/dev/null 2>&1 && [ "${VAULTDOCK_PULL:-0}" != 1 ]; then
-				info "Using existing image $cand"
-				env_set_managed VAULTDOCK_IMAGE "$cand"
-				return
-			fi
-			info "Pulling $cand"
-			if docker pull "$cand"; then
-				env_set_managed VAULTDOCK_IMAGE "$cand"
-				return
-			fi
-		done
+	local img=${VAULTDOCK_IMAGE:-} ver
+	if [ -z "$img" ] && [ -n "$RELEASE_VERSION" ] && [ -z "$(local_source)" ]; then img=$(registry_image); fi
+	if [ -n "$img" ] && [ "$img" != vaultdock:local ]; then
+		info "Pulling $img"
+		if docker pull "$img"; then
+			env_set_managed VAULTDOCK_IMAGE "$img"
+			ver=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.version"}}' "$img" 2>/dev/null || true)
+			env_set_managed VAULTDOCK_VERSION "${ver:-$RELEASE_VERSION}"
+			compose_drop_build
+			return
+		fi
 		warn "Could not pull $img; building from source instead."
-	elif [ "${VAULTDOCK_REBUILD:-1}" = 0 ] && docker image inspect "$img" >/dev/null 2>&1; then
+	elif [ "${VAULTDOCK_REBUILD:-1}" = 0 ] && docker image inspect vaultdock:local >/dev/null 2>&1; then
 		info "Reusing the existing local image"
-		env_set_managed VAULTDOCK_IMAGE "$img"
+		env_set_managed VAULTDOCK_IMAGE vaultdock:local
 		return
 	fi
 	info "Building the VaultDock image (first build downloads base images and can take a few minutes)"
@@ -338,6 +356,92 @@ build_image() {
 	with_build_source docker_build "${ver#v}" || return 1
 	env_set_managed VAULTDOCK_VERSION "${ver#v}"
 	env_set_managed VAULTDOCK_IMAGE "vaultdock:local"
+}
+
+# compose_drop_build: a locally modified docker-compose.yml is kept on upgrade,
+# so one from before released images may still build the image itself. Its
+# vaultdock build: section is removed and the image comes from VAULTDOCK_IMAGE;
+# every other change is kept (the old file is in the upgrade backup).
+compose_drop_build() {
+	local f="$APP/docker-compose.yml"
+	[ -f "$f" ] && grep -qE '^    build:' "$f" || return 0
+	awk '
+		skip && (/^      / || /^[[:space:]]*$/) { next }
+		{ skip = 0 }
+		/^    build:/ { skip = 1; next }
+		{ print }
+	' "$f" | sed -E 's#^(    image:[[:space:]]*)vaultdock:local[[:space:]]*$#\1${VAULTDOCK_IMAGE}#' >"$f.tmp"
+	mv -- "$f.tmp" "$f"
+	ok "docker-compose.yml now runs the released image (its build: section was removed; your other changes are kept)."
+}
+
+# image_current pulls the released image and reports whether VaultDock is
+# already running exactly that build (used by "upgrade --if-newer").
+image_current() {
+	local img=${VAULTDOCK_IMAGE:-$(registry_image)} running
+	running=$(docker inspect -f '{{.Image}}' vaultdock 2>/dev/null || true)
+	[ -n "$running" ] || return 1
+	if ! docker pull -q "$img" >/dev/null 2>&1; then
+		warn "Could not pull $img; trying again on the next run."
+		return 0
+	fi
+	[ "$(docker image inspect -f '{{.Id}}' "$img" 2>/dev/null || true)" = "$running" ]
+}
+
+# source_checkouts prints the source checkouts this installation was built
+# from: the folder install.sh runs from, the install folder itself, and
+# folders next to it whose .env links to this installation's configuration.
+source_checkouts() {
+	local d real seen=" " env_real
+	env_real=$(readlink -f -- "$ENV_FILE" 2>/dev/null || printf '%s' "$ENV_FILE")
+	for d in "$SCRIPT_DIR" "$DIR" "$(dirname -- "$DIR")"/*; do
+		[ -n "$d" ] && is_repo "$d" || continue
+		real=$(cd -- "$d" && pwd -P) || continue
+		case "$seen" in *" $real "*) continue ;; esac
+		seen="$seen$real "
+		if [ "$d" != "$SCRIPT_DIR" ] && [ "$d" != "$DIR" ]; then
+			[ -L "$d/.env" ] && [ "$(readlink -f -- "$d/.env")" = "$env_real" ] || continue
+		fi
+		printf '%s\n' "$real"
+	done
+}
+
+# remove_checkout DIR removes a source checkout that is no longer needed:
+# only files tracked by git (and .git itself) go; untracked files and data
+# stay. Checkouts with local changes or unpushed commits are kept.
+remove_checkout() {
+	local d=$1
+	if ! command -v git >/dev/null 2>&1 || [ ! -d "$d/.git" ]; then
+		warn "$d is a VaultDock source folder that is no longer needed; it is not a git checkout, so delete it yourself if you do not use it."
+		return 0
+	fi
+	if [ -n "$(git -C "$d" status --porcelain --untracked-files=no 2>/dev/null || echo x)" ] ||
+		[ "$(git -C "$d" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 1)" != 0 ]; then
+		warn "Kept the source checkout $d: it has local changes or unpushed commits. VaultDock no longer needs it."
+		return 0
+	fi
+	confirm "Remove the source checkout $d? VaultDock now runs from the released image (only tracked source files are removed; other files stay)." y || return 0
+	(cd -- "$d" && git ls-files -z | xargs -0 rm -f --)
+	rm -rf -- "$d/.git"
+	if [ -L "$d/.env" ]; then rm -f -- "$d/.env"; fi
+	find "$d" -depth -type d -empty -delete 2>/dev/null || true
+	if [ -d "$d" ]; then ok "Removed the source files from $d (other files in it were kept)."; else ok "Removed the source checkout $d."; fi
+}
+
+# finish_image_switch: once VaultDock runs from a released image, what only a
+# source build needed is removed: the local images and the source checkout.
+finish_image_switch() {
+	case "$(env_get VAULTDOCK_IMAGE)" in ghcr.io/*) ;; *) return 0 ;; esac
+	[ -z "${VAULTDOCK_SOURCE:-}" ] || return 0
+	local i d
+	for i in vaultdock:local vaultdock:rollback; do
+		if docker image inspect "$i" >/dev/null 2>&1 && docker image rm "$i" >/dev/null 2>&1; then
+			ok "Removed the image $i (no longer used)."
+		fi
+	done
+	while IFS= read -r d; do
+		[ -z "$d" ] || remove_checkout "$d"
+	done < <(source_checkouts)
 }
 
 # --- configuration (.env) ------------------------------------------------------
@@ -1314,6 +1418,8 @@ VAULTDOCK_UPDATE_CHECK=true
 VAULTDOCK_UPDATE_REPO=$REPO
 # Managed by "install.sh auto-update on|off".
 VAULTDOCK_AUTO_UPDATE=off
+# Release channel: production (image :latest) or development (image :dev).
+VAULTDOCK_CHANNEL=$(channel)
 # Managed by install.sh: the image and version currently installed.
 VAULTDOCK_IMAGE=
 VAULTDOCK_VERSION=
@@ -1358,6 +1464,7 @@ do_install() {
 		*) die "Cancelled. Nothing was changed." ;;
 		esac
 	fi
+	prefer_release
 	resolve_ref_if_remote
 	install_files
 	build_image
@@ -1393,22 +1500,6 @@ print_summary() {
 }
 
 # --- upgrade -------------------------------------------------------------------
-# version_newer A B: true when release A is newer than B. A non-version B
-# (for example a build of the main branch) is always considered older.
-version_newer() {
-	local a=${1%%[-+]*} b=${2%%[-+]*} i x y
-	local -a va vb
-	[[ "$b" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || return 0
-	IFS=. read -r -a va <<<"$a"; IFS=. read -r -a vb <<<"$b"
-	for i in 0 1 2; do
-		x=${va[$i]:-0}; y=${vb[$i]:-0}
-		((10#$x > 10#$y)) && return 0
-		((10#$x < 10#$y)) && return 1
-	done
-	# Same core version: a final release is newer than a pre-release of it.
-	[ "$1" = "$a" ] && [ "$2" != "$b" ]
-}
-
 backup_now() { # backup_now -> prints backup dir
 	local ts dest; ts=$(date +%Y%m%d-%H%M%S); dest="$BACKUPS/upgrade-$ts"
 	mkdir -p -- "$dest"
@@ -1454,6 +1545,10 @@ do_upgrade() {
 	require
 	installed || die "No VaultDock installation found in $DIR. Choose Install first."
 	upgrade_lock
+	prefer_release
+	# The image VaultDock runs now is kept as vaultdock:rollback before
+	# anything is pulled (pulling moves :latest).
+	local running; running=$(docker inspect -f '{{.Image}}' vaultdock 2>/dev/null || true)
 	if [ -z "$(local_source)" ]; then
 		resolve_ref
 		local current; current=$(env_get VAULTDOCK_VERSION)
@@ -1462,12 +1557,13 @@ do_upgrade() {
 				info "No published release to upgrade to. Nothing to do."
 				return 0
 			fi
-			if [ "${current#v}" = "$RELEASE_VERSION" ] || ! version_newer "$RELEASE_VERSION" "${current#v}"; then
-				info "VaultDock ${current:-?} is up to date (latest release: $RELEASE_VERSION)."
+			[ -z "$running" ] || docker tag "$running" vaultdock:rollback
+			if image_current; then
+				info "VaultDock ${current:-?} is up to date ($(registry_image))."
 				return 0
 			fi
 		fi
-		info "Upgrading VaultDock ${current:-?} to ${RELEASE_VERSION:-$REF}"
+		info "Upgrading VaultDock ${current:-?} to the latest $(channel) release (${RELEASE_VERSION:-$REF})"
 	fi
 	# The KEK is checked before anything changes: an install from before the
 	# KEK gets one now; a missing KEK with sealed keys in the DB stops here.
@@ -1481,7 +1577,8 @@ do_upgrade() {
 	ok "Backup written to $bk"
 	local prev_image; prev_image=$(env_get VAULTDOCK_IMAGE); prev_image=${prev_image:-vaultdock:local}
 	local prev_version; prev_version=$(env_get VAULTDOCK_VERSION)
-	docker image inspect "$prev_image" >/dev/null 2>&1 && docker tag "$prev_image" vaultdock:rollback
+	if [ -n "$running" ]; then docker tag "$running" vaultdock:rollback
+	elif docker image inspect "$prev_image" >/dev/null 2>&1; then docker tag "$prev_image" vaultdock:rollback; fi
 	upgrade_files
 	if ! build_image; then
 		warn "Build failed; restoring the previous version."
@@ -1494,6 +1591,7 @@ do_upgrade() {
 		rm -rf -- "$APP.old"
 		ok "Upgrade complete. Backup kept at $bk"
 		link_source_env
+		finish_image_switch
 		if [ -n "$MODIFIED_FILES" ]; then warn "Locally modified files:$MODIFIED_FILES (see the .new/.local copies in $APP)."; fi
 		kek_backup_prompt
 		return
@@ -1875,7 +1973,7 @@ do_uninstall_node() {
 
 do_status() {
 	if installed; then
-		info "Installed in $DIR (version $(env_get VAULTDOCK_VERSION), configuration $ENV_FILE)"
+		info "Installed in $DIR (version $(env_get VAULTDOCK_VERSION), $(channel) channel, image $(env_get VAULTDOCK_IMAGE), configuration $ENV_FILE)"
 		compose ps || true
 	else
 		info "Not installed in $DIR"

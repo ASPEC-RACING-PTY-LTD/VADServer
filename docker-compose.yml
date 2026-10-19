@@ -17,11 +17,10 @@ name: vaultdock
 
 services:
   vaultdock:
-    image: ${VAULTDOCK_IMAGE:-vaultdock:local}
-    build:
-      context: .
-      args:
-        VERSION: ${VAULTDOCK_VERSION:-dev}
+    # The released image (install.sh keeps VAULTDOCK_IMAGE at :latest, or :dev
+    # on the development channel). To run a local build instead:
+    #   docker build -t vaultdock:local . && VAULTDOCK_IMAGE=vaultdock:local docker compose up -d
+    image: ${VAULTDOCK_IMAGE:-ghcr.io/aspec-racing-pty-ltd/vad-server:latest}
     container_name: vaultdock
     restart: unless-stopped
     user: "${VAULTDOCK_UID:-65532}:${VAULTDOCK_GID:-65532}"

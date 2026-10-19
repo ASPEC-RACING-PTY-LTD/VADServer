@@ -15,7 +15,7 @@ The server of VaultDock: self-hosted file storage and intelligent synchronisatio
 curl -fsSL https://raw.githubusercontent.com/ASPEC-RACING-PTY-LTD/vad-server/main/install.sh | bash
 ```
 
-The installer shows a menu: **1) Install / Replace, 2) Upgrade, 3) Uninstall, 4) Automatic updates**. It installs the latest release into `~/VaultDock` (or `/root/VaultDock` as root): only the server's runtime files go into `~/VaultDock/app`, together with a complete, pre-filled `.env` (generated setup token included). It asks where to store files (point it at your HDD) and how the server is reached (Cloudflare Tunnel or reverse proxy, built-in Caddy, self-signed, or plain HTTP), pulls the prebuilt image `ghcr.io/aspec-racing-pty-ltd/vad-server` (or builds it from a temporary copy of the source), starts the container on port 3000, and waits until it is healthy.
+The installer shows a menu: **1) Install / Replace, 2) Upgrade, 3) Uninstall, 4) Automatic updates**. It installs the latest release into `~/VaultDock` (or `/root/VaultDock` as root): only the server's runtime files go into `~/VaultDock/app`, together with a complete, pre-filled `.env` (generated setup token included). It asks where to store files (point it at your HDD) and how the server is reached (Cloudflare Tunnel or reverse proxy, built-in Caddy, self-signed, or plain HTTP), pulls the released image `ghcr.io/aspec-racing-pty-ltd/vad-server:latest` (or, before the first release, builds it from a temporary copy of the source), starts the container on port 3000, and waits until it is healthy.
 
 Then open the printed URL, create the administrator with the setup token, and install the desktop app.
 
@@ -29,7 +29,7 @@ less install.sh
 bash install.sh
 ```
 
-Or clone the repository and run `./install.sh` from it; the installer then uses the local source instead of downloading. Pin a release with `VAULTDOCK_REF=v1.0.0`.
+Installs always follow the newest release: `:latest` on the production channel, or `:dev` with `VAULTDOCK_CHANNEL=development` (kept in `.env`). Versions are never pinned. To build from a local source tree instead, run it with `VAULTDOCK_SOURCE=/path/to/vad-server`.
 
 What the installer does and does not do:
 
@@ -56,7 +56,7 @@ Backups are encrypted on the PC before upload. By default the server also holds 
 
 - **Desktop app**: updates itself from the GitHub releases of `ASPEC-RACING-PTY-LTD/vad-client`. Installers are verified against their published SHA-256 checksum and installed while nothing is syncing.
 - **Server**: the admin console shows new releases. Upgrade with `~/VaultDock/app/install.sh upgrade`, or turn on nightly updates with `~/VaultDock/app/install.sh auto-update on`. Every upgrade backs up first and rolls back automatically if the new version is unhealthy.
-- **Releases**: push a `vX.Y.Z` tag and the Release workflow publishes the multi-architecture image `ghcr.io/aspec-racing-pty-ltd/vad-server:<version>` and a GitHub release with `install.sh`, `docker-compose.yml`, `env.example`, `deploy.tar.gz` and `SHA256SUMS`. The Windows installer is released from the `VaultDock` repository.
+- **Releases**: a push to `main` whose commit message contains `DEPLOY: Production` or `DEPLOY: Development` runs the Release workflow; any other push releases nothing. See [Releases](docs/operations.md#releases) for the version rules and what each channel publishes. The Windows app is released from the `vad-client` repository.
 
 ## Documentation
 
