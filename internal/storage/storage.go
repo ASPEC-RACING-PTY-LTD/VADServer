@@ -331,7 +331,16 @@ func (m *Manager) TempPath(locID int64, uploadID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(l.Path, "tmp", uploadID+".part"), nil
+	// The tmp directory is recreated if it went missing (for example a
+	// location moved without it); only on a mounted location (marker present).
+	dir := filepath.Join(l.Path, "tmp")
+	if err := LocationHealthy(l.Path); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", fmt.Errorf("create upload temp directory: %w", err)
+	}
+	return filepath.Join(dir, uploadID+".part"), nil
 }
 
 // Space describes a filesystem's capacity.
