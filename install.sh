@@ -1833,7 +1833,7 @@ node_fetch_agent() {
 
 # node_wait DIR URL: waits until an admin approves the node (or it fails).
 node_wait() {
-	local ndir=$1 url=$2 out rc shown=0 deadline
+	local ndir=$1 url=$2 out rc shown=0 deadline lasterr=""
 	if [ "${VAD_NODE_NO_WAIT:-0}" = 1 ]; then info "Not waiting for approval (VAD_NODE_NO_WAIT=1). Check later: $ndir/bin/vad-node status"; return; fi
 	deadline=$(( $(date +%s) + 65 * 60 ))
 	while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -1847,7 +1847,8 @@ node_wait() {
 					"$(grep -E '^VAD_NODE_NAME=' "$ndir/.env" | cut -d= -f2-)" "$(grep -E '^VAD_NODE_IP=' "$ndir/.env" | cut -d= -f2-)" "$(date '+%Y-%m-%d %H:%M')"
 				shown=1
 			fi ;;
-		3:*) warn "${out}"; die "The node was not approved. See: journalctl -u $NODE_SERVICE" ;;
+		3:*) warn "${out}"; die "The node was rejected in the admin console. Run the installer again to send a new request." ;;
+		4:*) if [ "$out" != "$lasterr" ]; then warn "${out} (the service keeps retrying)"; lasterr=$out; fi ;;
 		esac
 		sleep 3
 	done

@@ -957,6 +957,7 @@ CREATE TABLE storage_nodes (
 	last_error       TEXT NOT NULL DEFAULT '',
 	terminal_enabled INTEGER NOT NULL DEFAULT 0,
 	storage_roots    TEXT NOT NULL DEFAULT '',
+	copy_key         TEXT NOT NULL DEFAULT '', -- sealed per-node key for copies (never sent to the node)
 	decided_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	decided_at       INTEGER,
 	expires_at       INTEGER NOT NULL,

@@ -163,17 +163,9 @@ func (s *Server) nodeJob(w http.ResponseWriter, r *http.Request) (*store.Storage
 	return n, j, meta
 }
 
-func (s *Server) copyKey() ([]byte, error) {
-	k, err := s.Keys().Derive("node-copies")
-	if err != nil {
-		return nil, errors.New("the server key (KEK) is not available, so copies cannot be encrypted for nodes")
-	}
-	return k, nil
-}
-
 // handleNodeJobDataGet streams the encrypted blob of a put job.
 func (s *Server) handleNodeJobDataGet(w http.ResponseWriter, r *http.Request) {
-	_, j, meta := s.nodeJob(w, r)
+	n, j, meta := s.nodeJob(w, r)
 	if j == nil {
 		return
 	}
@@ -181,7 +173,7 @@ func (s *Server) handleNodeJobDataGet(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(409, "not_put", "This job has no data to download"))
 		return
 	}
-	key, err := s.copyKey()
+	key, err := s.nodeCopyKey(r.Context(), n.ID)
 	if err != nil {
 		writeErr(w, r, errf(503, "no_key", "%s", err.Error()))
 		return
@@ -213,7 +205,7 @@ func (s *Server) handleNodeJobDataGet(w http.ResponseWriter, r *http.Request) {
 // handleNodeJobDataPut receives a node's stored copy (get job), decrypts it
 // and restores the primary file from it.
 func (s *Server) handleNodeJobDataPut(w http.ResponseWriter, r *http.Request) {
-	_, j, meta := s.nodeJob(w, r)
+	n, j, meta := s.nodeJob(w, r)
 	if j == nil {
 		return
 	}
@@ -221,7 +213,7 @@ func (s *Server) handleNodeJobDataPut(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(409, "not_get", "This job does not take data"))
 		return
 	}
-	key, err := s.copyKey()
+	key, err := s.nodeCopyKey(r.Context(), n.ID)
 	if err != nil {
 		writeErr(w, r, errf(503, "no_key", "%s", err.Error()))
 		return
@@ -296,6 +288,19 @@ func (s *Server) applyJobResult(ctx context.Context, j *store.NodeJob, meta jobM
 	case nodeapi.JobPut:
 		c, err := s.st.BlobCopy(ctx, meta.UserID, meta.SHA256, meta.Target)
 		if err != nil {
+			// Nobody tracks this copy any more (deleted while it was being
+			// made): remove what the node stored so nothing is left behind.
+			if res.OK {
+				_, _ = s.enqueueJob(ctx, j.NodeID, nodeapi.JobDelete, jobMeta{JobPayload: nodeapi.JobPayload{LocationID: meta.LocationID, UserID: meta.UserID, SHA256: meta.SHA256}, Target: meta.Target})
+			}
+			return
+		}
+		if c.State == "deleting" {
+			// Unwanted while it was being made: the pending delete removes it.
+			if res.OK && res.SHA256 != "" {
+				c.StoredSHA256 = res.SHA256
+				_ = s.st.SetCopy(ctx, c)
+			}
 			return
 		}
 		hub.mu.Lock()

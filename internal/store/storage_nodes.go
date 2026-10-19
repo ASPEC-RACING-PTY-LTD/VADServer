@@ -227,3 +227,20 @@ func (s *Store) DeleteStorageNode(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+// StorageNodeCopyKey returns the sealed copy key of a node ("" if none yet).
+func (s *Store) StorageNodeCopyKey(ctx context.Context, id int64) (string, error) {
+	var k string
+	err := s.DB.QueryRowContext(ctx, "SELECT copy_key FROM storage_nodes WHERE id = ?", id).Scan(&k)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrStorageNodeNotFound
+	}
+	return k, err
+}
+
+// SetStorageNodeCopyKey stores a sealed copy key unless the node has one
+// already (a key is never replaced: copies made with it must stay readable).
+func (s *Store) SetStorageNodeCopyKey(ctx context.Context, id int64, sealed string) error {
+	_, err := s.DB.ExecContext(ctx, "UPDATE storage_nodes SET copy_key = ? WHERE id = ? AND copy_key = ''", sealed, id)
+	return err
+}

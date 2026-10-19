@@ -2,7 +2,7 @@
 // ("Install Node") installs it as the systemd service vad-node:
 //
 //	vad-node run [--dir DIR]      join the server (admin approval), then heartbeat and self-update
-//	vad-node status [--dir DIR]   show the join/connection state (exit 0 approved, 2 pending, 3 failed)
+//	vad-node status [--dir DIR]   show the join/connection state (exit 0 approved, 2 waiting, 3 rejected, 4 error, retrying)
 //	vad-node version
 //
 // DIR defaults to the parent of the binary's folder (<dir>/bin/vad-node).
@@ -92,8 +92,11 @@ func status(dir string) int {
 	switch st.State {
 	case "approved":
 		return 0
-	case "pending", "starting", "expired", "revoked":
-		return 2
+	case "rejected":
+		return 3
+	case "error":
+		return 4 // the service keeps retrying (for example the server is unreachable)
 	}
-	return 3
+	return 2 // pending, starting, expired, revoked: a request is (re)sent
+
 }

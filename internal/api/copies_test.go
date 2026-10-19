@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/vdcrypt"
-	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/keys"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/nodeagent"
 )
 
@@ -103,14 +101,7 @@ func download(t *testing.T, w *web, base string, id int64) []byte {
 // served (and repaired) from the node, and deleting the file deletes the
 // copies after the rule's delay.
 func TestCopyRulesLocalAndNode(t *testing.T) {
-	e := newEnv(t, "")
-	var kek vdcrypt.Key
-	rand.Read(kek[:])
-	km, err := keys.New(context.Background(), e.st, kek)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.srv.SetKeys(km)
+	e := newEnv(t, "") // no KEK: node copies use per-node keys
 	admin := e.setupAdmin()
 	alice := e.createUser(admin, "alice", 0)
 	dc := e.enrollDevice(alice, "alice", "password-alice")
@@ -125,6 +116,13 @@ func TestCopyRulesLocalAndNode(t *testing.T) {
 	secondID := int64(loc["location"].(map[string]any)["id"].(float64))
 	nodeRoot := t.TempDir()
 	_, nid := startNode(t, e, admin, nodeRoot, false)
+	// Approval created the node key file and the node's sealed copy key.
+	if b, err := os.ReadFile(filepath.Join(e.dir, "state", "keys", "node-copies.key")); err != nil || len(b) != 32 {
+		t.Fatalf("node key file: %v", err)
+	}
+	if k, err := e.st.StorageNodeCopyKey(context.Background(), nid); err != nil || len(k) < 60 {
+		t.Fatalf("sealed copy key = %q, %v", k, err)
+	}
 	admin.must("POST", "/api/v1/admin/node-locations", map[string]any{"node_id": nid, "name": "tank", "path": filepath.Join(t.TempDir(), "outside")}, 400) // outside the node's roots
 	nl := admin.must("POST", "/api/v1/admin/node-locations", map[string]any{"node_id": nid, "name": "tank", "path": nodeRoot}, 201)
 	nlID := int64(nl["id"].(float64))

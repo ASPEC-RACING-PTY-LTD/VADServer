@@ -166,6 +166,16 @@ func (s *Server) handleNodeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.syncNodeLocations(r.Context(), n.ID, hb.Locations)
+	// Jobs claimed before the agent (re)started were lost with the old process
+	// (restart, self-update): fail them now so the work is retried at once.
+	if hb.UptimeSeconds >= 0 && hb.UptimeSeconds < 24*3600 {
+		started := time.Now().Add(-time.Duration(hb.UptimeSeconds)*time.Second - 5*time.Second).UnixMilli()
+		if lost, err := s.st.ClaimedNodeJobsBefore(r.Context(), n.ID, started); err == nil {
+			for _, j := range lost {
+				s.failJob(context.WithoutCancel(r.Context()), j, "the node restarted before finishing the job")
+			}
+		}
+	}
 	resp := nodeapi.HeartbeatResponse{PollInterval: nodeHeartbeatInterval}
 	if (n.AutoUpdate || n.UpdateRequested) && updatableVersion(Version) && hb.Version != Version {
 		if f, ok := s.agentFile(hb.OS, hb.Arch); ok {
@@ -196,7 +206,7 @@ func (s *Server) syncNodeLocations(ctx context.Context, nodeID int64, reported [
 			_ = s.st.SetNodeLocationStatus(ctx, l.ID, "ok", "", rep.DiskTotal, rep.DiskFree)
 		case ok:
 			_ = s.st.SetNodeLocationStatus(ctx, l.ID, "error", rep.Error, rep.DiskTotal, rep.DiskFree)
-		case l.Status != "preparing":
+		case l.Status == "ok": // the node lost a working location (reinstalled, data wiped)
 			if open, _ := s.st.CountOpenNodeJobs(ctx, nodeID, nodeapi.JobPrepare); open == 0 {
 				_ = s.st.SetNodeLocationStatus(ctx, l.ID, "preparing", "", 0, 0)
 				_, _ = s.enqueueJob(ctx, nodeID, nodeapi.JobPrepare, jobMeta{JobPayload: nodeapi.JobPayload{LocationID: l.ID, Path: l.Path}})
@@ -344,6 +354,13 @@ func (s *Server) handleAdminNodeDecision(status string) http.HandlerFunc {
 			verb = "rejected"
 		}
 		s.activity(r, principal(r).User.ID, "node."+verb, n.Name, fmt.Sprintf("%s storage node %q (%s)", verb, n.Name, n.RequestIP), true)
+		if status == "approved" {
+			// The node's copy key is created with the approval (node_keys.go).
+			if _, err := s.nodeCopyKey(r.Context(), n.ID); err != nil {
+				writeErr(w, r, err)
+				return
+			}
+		}
 		n, _ = s.st.StorageNode(r.Context(), n.ID)
 		writeJSON(w, 200, s.viewNode(*n))
 	}

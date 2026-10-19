@@ -236,7 +236,7 @@ func (a *Agent) jobPut(ctx context.Context, auth map[string]string, job nodeapi.
 	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return nodeapi.JobResult{}, err
 	}
-	tmp := dst + ".part"
+	tmp := fmt.Sprintf("%s.%d.part", dst, job.ID) // unique per job: a retried job never shares it
 	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o640)
 	if err != nil {
 		return nodeapi.JobResult{}, err

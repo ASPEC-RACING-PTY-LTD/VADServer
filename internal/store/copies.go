@@ -267,11 +267,12 @@ func (s *Store) ListCopies(ctx context.Context, state string, limit int) ([]Blob
 	return s.queryCopies(ctx, "c.state = ? ORDER BY c.updated_at DESC LIMIT ?", state, limit)
 }
 
-// DueCopies returns copies to work on: pending ones due now, ok ones whose
+// DueCopies returns copies to work on: pending and failed ones due now
+// (failed ones after their backoff), ok ones whose
 // check is older than verifyBefore, and deletions that are due.
 func (s *Store) DueCopies(ctx context.Context, verifyBefore int64, limit int) ([]BlobCopy, error) {
 	t := now()
-	return s.queryCopies(ctx, `(c.state = 'pending' AND c.next_at <= ?)
+	return s.queryCopies(ctx, `(c.state IN ('pending','failed') AND c.next_at <= ?)
 		OR (c.state = 'ok' AND COALESCE(c.verified_at, 0) < ? AND c.next_at <= ?)
 		OR (c.state = 'deleting' AND COALESCE(c.delete_at, 0) <= ? AND c.next_at <= ?)
 		ORDER BY c.state = 'deleting' DESC, c.state = 'pending' DESC, c.next_at LIMIT ?`, t, verifyBefore, t, t, t, limit)
@@ -507,6 +508,25 @@ func (s *Store) CountOpenNodeJobs(ctx context.Context, nodeID int64, kinds ...st
 // older than queuedBefore, which are failed by the caller.
 func (s *Store) StaleNodeJobs(ctx context.Context, claimedBefore, queuedBefore int64) ([]NodeJob, error) {
 	rows, err := s.DB.QueryContext(ctx, "SELECT "+nodeJobCols+" FROM node_jobs WHERE (status = 'claimed' AND claimed_at < ?) OR (status = 'queued' AND created_at < ?)", claimedBefore, queuedBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []NodeJob
+	for rows.Next() {
+		j, err := scanNodeJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *j)
+	}
+	return out, rows.Err()
+}
+
+// ClaimedNodeJobsBefore returns a node's jobs claimed before t (lost when
+// the node restarted after claiming them).
+func (s *Store) ClaimedNodeJobsBefore(ctx context.Context, nodeID, t int64) ([]NodeJob, error) {
+	rows, err := s.DB.QueryContext(ctx, "SELECT "+nodeJobCols+" FROM node_jobs WHERE node_id = ? AND status = 'claimed' AND claimed_at < ?", nodeID, t)
 	if err != nil {
 		return nil, err
 	}

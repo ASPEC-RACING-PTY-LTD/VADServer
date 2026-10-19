@@ -7,7 +7,8 @@ package api
 //   - plans: works out which blobs each rule wants copied (and which copies
 //     are no longer wanted: those are deleted only after the rule's delay, so
 //     a mistake can be undone with "Recover");
-//   - copies: local copies directly, node copies through node jobs;
+//   - copies: local copies directly, node copies through node jobs
+//     (encrypted with the node's own copy key, node_keys.go);
 //   - checks: every copy and the original are re-hashed on a schedule; a
 //     damaged copy is made again and a damaged or missing original is
 //     repaired from a good copy;
@@ -335,8 +336,8 @@ func (s *Server) makeCopy(ctx context.Context, c *store.BlobCopy, t copyTarget) 
 		s.copyFailed(ctx, c, "the node location is not ready ("+firstNonEmpty(l.Error, l.Status)+")")
 		return
 	}
-	if _, err := s.copyKey(); err != nil {
-		s.copyFailed(ctx, c, err.Error())
+	if _, err := s.nodeCopyKey(ctx, n.ID); err != nil {
+		s.copyFailed(ctx, c, "the node's copy key is unavailable: "+err.Error())
 		return
 	}
 	if open, _ := s.st.CountOpenNodeJobs(ctx, n.ID, nodeapi.JobPut); open >= copyNodeInFlight {
@@ -381,6 +382,13 @@ func (s *Server) verifyCopy(ctx context.Context, c *store.BlobCopy, t copyTarget
 
 func (s *Server) deleteCopy(ctx context.Context, c *store.BlobCopy, t copyTarget) {
 	if t.Kind == "local" {
+		if _, ok := s.blobs.Location(t.ID); !ok {
+			_ = s.blobs.Reload(ctx)
+		}
+		if _, ok := s.blobs.Location(t.ID); !ok { // the location was removed: nothing left to delete
+			_ = s.st.DeleteCopyRow(ctx, c.UserID, c.SHA256, c.Target)
+			return
+		}
 		if err := s.blobs.RemoveReplica(t.ID, c.UserID, c.SHA256); err != nil && !errors.Is(err, os.ErrNotExist) {
 			c.NextAt, c.LastError = time.Now().Add(time.Hour).UnixMilli(), "delete failed: "+err.Error()
 			_ = s.st.SetCopy(ctx, c)
@@ -680,7 +688,7 @@ func (s *Server) copyTargets(ctx context.Context) []targetView {
 }
 
 func (s *Server) handleCopyTargets(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"items": s.copyTargets(r.Context()), "key_available": s.Keys() != nil})
+	writeJSON(w, 200, map[string]any{"items": s.copyTargets(r.Context())})
 }
 
 func (s *Server) handleCopyRules(w http.ResponseWriter, r *http.Request) {
@@ -726,10 +734,6 @@ func (s *Server) handleCopyRuleSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if t.Kind == "local" && req.SourceLocationID != nil && *req.SourceLocationID == t.ID {
 		writeErr(w, r, errf(400, "same_location", "The copy must go to a different location than the source"))
-		return
-	}
-	if t.Kind == "node" && s.Keys() == nil {
-		writeErr(w, r, errf(409, "no_key", "Copies on nodes are encrypted with a key derived from the server key (KEK), which this server does not have. Create it with install.sh first."))
 		return
 	}
 	if req.MinSize < 0 || req.MaxSize < 0 || (req.MaxSize > 0 && req.MaxSize < req.MinSize) {
@@ -788,7 +792,7 @@ func (s *Server) handleCopiesSummary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"targets": out, "primary_checked": checked, "primary_bad": bad,
 		"running": cs.running, "last_run": cs.lastRun, "last_plan": cs.lastPlan, "wanted": cs.planned, "last_error": cs.lastError,
-		"key_available": s.Keys() != nil, "verify_days": int(copyVerifyEvery / (24 * time.Hour)),
+		"verify_days": int(copyVerifyEvery / (24 * time.Hour)),
 	})
 }
 
@@ -864,6 +868,12 @@ func (s *Server) handleCopiesRecover(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, r, err)
 		return
+	}
+	// Keep the copy until the recovery is over.
+	hold := time.Now().Add(copyRecoverTimeout + time.Hour).UnixMilli()
+	if c.DeleteAt == nil || *c.DeleteAt < hold {
+		c.DeleteAt = &hold
+		_ = s.st.SetCopy(r.Context(), c)
 	}
 	admin := principal(r).User.ID
 	s.activity(r, admin, "copies.recover", c.LastPath, fmt.Sprintf("recovering %s for %s from %s", c.LastPath, u.Username, c.Target), true)
