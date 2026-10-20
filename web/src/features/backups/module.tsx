@@ -1,18 +1,17 @@
 import { lazy } from 'react'
-import { HardDriveDownload } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
 import type { FeatureModule } from '../../app/types'
 
-const JobsPage = lazy(() => import('./JobsPage'))
 const JobPage = lazy(() => import('./JobPage'))
 const RunPage = lazy(() => import('./RunPage'))
 
+// Backups live on the Sync page (Backups & Restore tab); job and run pages keep their own routes.
 export default {
   id: 'backups',
   routes: [
-    { path: '/backups', component: JobsPage },
+    { path: '/backups', component: () => <Navigate to="/sync/backups" replace /> },
     { path: '/backups/jobs/:id', component: JobPage },
     { path: '/backups/runs/:id', component: RunPage },
   ],
-  nav: { label: 'Backups', icon: HardDriveDownload, order: 45 },
   requiredFeatureFlag: 'backup.v1',
 } satisfies FeatureModule

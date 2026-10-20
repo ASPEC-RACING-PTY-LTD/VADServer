@@ -1,6 +1,7 @@
 export function formatBytes(n: number | undefined | null, digits = 1): string {
   if (n === undefined || n === null || isNaN(n)) return '-'
   if (n < 1024) return `${n} B`
+  // Binary units throughout: 1 TB is 1024 GB, never shown as "1024 GB".
   const units = ['KB', 'MB', 'GB', 'TB', 'PB']
   let v = n
   let i = -1
@@ -8,7 +9,25 @@ export function formatBytes(n: number | undefined | null, digits = 1): string {
     v /= 1024
     i++
   } while (v >= 1024 && i < units.length - 1)
-  return `${v.toFixed(v >= 100 ? 0 : digits)} ${units[i]}`
+  let text = v.toFixed(v >= 100 ? 0 : digits)
+  if (Number(text) >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+    text = v.toFixed(digits)
+  }
+  return `${text} ${units[i]}`
+}
+
+/** Units for size inputs (binary). */
+export const sizeUnits = [
+  { label: 'MB', mult: 1024 ** 2 },
+  { label: 'GB', mult: 1024 ** 3 },
+  { label: 'TB', mult: 1024 ** 4 },
+] as const
+
+/** The largest unit that shows n as a whole-ish number (at least 1). */
+export function sizeUnitFor(n: number): (typeof sizeUnits)[number] {
+  return [...sizeUnits].reverse().find((u) => n >= u.mult) ?? sizeUnits[0]
 }
 
 export function formatSpeed(bps: number): string {

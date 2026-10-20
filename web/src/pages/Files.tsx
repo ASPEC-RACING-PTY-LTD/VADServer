@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useState, type DragEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { del } from '../lib/api'
 import { previewable } from '../lib/format'
@@ -18,6 +18,7 @@ import { rowActions } from '../components/files/rowActions'
 import { TagsModal } from '../components/files/TagsModal'
 import { downloadIDs, NODES_MIME, type Node, type Sort } from '../components/files/types'
 import { UploadControls, type PickedFile } from '../components/files/UploadControls'
+import { UploadsModal } from '../components/files/UploadsModal'
 import { useFileMutations } from '../components/files/useFileMutations'
 import { useFilesQuery } from '../components/files/useFilesQuery'
 import { useFileShortcuts } from '../components/files/useFileShortcuts'
@@ -46,8 +47,12 @@ export function FilesPage() {
   const [tagging, setTagging] = useState<Node | null>(null)
   const [newFolder, setNewFolder] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const fileInput = useRef<HTMLInputElement>(null)
-  const folderInput = useRef<HTMLInputElement>(null)
+  // ?uploads=1 (the header's upload indicator) opens the uploads dialog.
+  const [uploadsOpen, setUploadsOpen] = useState(false)
+  const wantUploads = params.get('uploads') === '1'
+  useEffect(() => {
+    if (wantUploads) setUploadsOpen(true)
+  }, [wantUploads])
 
   const { listQ, items, crumbs, folder, folderPath } = useFilesQuery({ parent: folderId ?? 'root', sort, kind, searchQ, filter })
   const { selected, setSelected, onRowClick, toggleOne } = useSelection(items)
@@ -85,7 +90,7 @@ export function FilesPage() {
     }
     const base = folderPath === '/' ? '' : folderPath
     uploads.enqueue(files.map((f) => ({ file: f.file, path: `${base}/${f.rel}` })))
-    toast('info', `Uploading ${files.length} file(s)`, 'Track progress on the Uploads page.')
+    toast('info', `Uploading ${files.length} file(s)`, 'Progress is shown under Uploads.')
   }
 
   const onDrop = async (e: DragEvent) => {
@@ -142,7 +147,7 @@ export function FilesPage() {
         crumbs={crumbs}
         onBack={() => navigate('/files')}
         onMoveTo={moveTo}
-        actions={<UploadControls showButtons={!searchQ} fileInput={fileInput} folderInput={folderInput} onNewFolder={() => setNewFolder(true)} onFiles={enqueueFiles} />}
+        actions={<UploadControls showButtons={!searchQ} activeCount={uploads.items.filter((i) => ['queued', 'uploading', 'paused', 'finalizing'].includes(i.status)).length} onNewFolder={() => setNewFolder(true)} onUploads={() => setUploadsOpen(true)} />}
       />
 
       <FilesToolbar
@@ -168,7 +173,7 @@ export function FilesPage() {
       ) : listQ.error ? (
         <ErrorState error={listQ.error} onRetry={() => listQ.refetch()} />
       ) : items.length === 0 ? (
-        <FilesEmpty filtered={!!(searchQ || filter || kind)} onUpload={() => fileInput.current?.click()} />
+        <FilesEmpty filtered={!!(searchQ || filter || kind)} onUpload={() => setUploadsOpen(true)} />
       ) : view === 'list' ? (
         <FileTable {...viewProps} onSelectAll={(all) => setSelected(all ? new Set(items.map((i) => i.id)) : new Set())} onMoveTo={moveTo} showPath={!!searchQ} total={listQ.data?.total} filtered={!!filter} />
       ) : (
@@ -179,6 +184,19 @@ export function FilesPage() {
 
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={menuFor(ctx.node)} onClose={() => setCtx(null)} />}
       {preview && <PreviewModal node={preview} list={previewList} onNavigate={setPreview} onClose={() => setPreview(null)} />}
+      <UploadsModal
+        open={uploadsOpen}
+        onClose={() => {
+          setUploadsOpen(false)
+          if (params.has('uploads')) {
+            params.delete('uploads')
+            setParams(params, { replace: true })
+          }
+        }}
+        folderPath={folderPath}
+        canUpload={!searchQ}
+        onFiles={enqueueFiles}
+      />
       <NewFolderModal open={newFolder} parentId={folder?.id ?? 0} onClose={() => setNewFolder(false)} onDone={refresh} />
       <RenameModal node={renaming} onClose={() => setRenaming(null)} onDone={refresh} />
       <TagsModal node={tagging} onClose={() => setTagging(null)} onDone={refresh} />

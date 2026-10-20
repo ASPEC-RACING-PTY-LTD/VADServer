@@ -1,12 +1,9 @@
-import { lazy } from 'react'
-import { History } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
 import type { FeatureModule } from '../../app/types'
 
-const RestorePage = lazy(() => import('./RestorePage'))
-
+// Restore is part of Sync > Backups & Restore; old links go there.
 export default {
   id: 'restore',
-  routes: [{ path: '/restore', component: RestorePage }],
-  nav: { label: 'Restore', icon: History, order: 46 },
+  routes: [{ path: '/restore', component: () => <Navigate to="/sync/backups" replace /> }],
   requiredFeatureFlag: 'restore.v1',
 } satisfies FeatureModule

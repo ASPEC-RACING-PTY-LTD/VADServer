@@ -1,4 +1,8 @@
 import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useFeatureContext } from '../app/useFeatureContext'
+import { BackupJobsPanel } from '../features/backups/JobsPage'
+import { RestorePanel } from '../features/restore/RestorePage'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ArrowUpFromLine, CheckCircle2, Folder, Gauge, Laptop, PauseCircle, RefreshCw, Timer, X, XCircle } from 'lucide-react'
 import { get, post } from '../lib/api'
@@ -97,7 +101,44 @@ function DeviceSync({ d }: { d: any }) {
   )
 }
 
+/**
+ * Sync: everything devices keep on this server in one place. Synced folders and transfers, and
+ * (when the server has them) backups and restores, which are another kind of sync.
+ */
 export default function SyncPage() {
+  const { tab: section } = useParams()
+  const navigate = useNavigate()
+  const { flags } = useFeatureContext()
+  const backups = flags.has('backup.v1') || flags.has('restore.v1')
+  const onBackups = backups && section === 'backups'
+  return (
+    <div>
+      <PageHeader title="Sync" description="Folders and files your devices sync to this server, their backups, and restores." icon={<RefreshCw className="size-5" />} />
+      {backups && (
+        <div className="mb-6">
+          <Tabs
+            value={onBackups ? 'backups' : ''}
+            onChange={(v) => navigate(v ? `/sync/${v}` : '/sync')}
+            tabs={[
+              { id: '', label: 'Synced folders' },
+              { id: 'backups', label: 'Backups & Restore' },
+            ]}
+          />
+        </div>
+      )}
+      {onBackups ? (
+        <div className="space-y-10">
+          {flags.has('backup.v1') && <BackupJobsPanel />}
+          {flags.has('restore.v1') && <RestorePanel />}
+        </div>
+      ) : (
+        <SyncedFolders />
+      )}
+    </div>
+  )
+}
+
+function SyncedFolders() {
   const [tab, setTab] = useState<'' | 'succeeded' | 'failed' | 'active'>('')
   const qc = useQueryClient()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['sync-overview'], queryFn: () => get('/sync/overview'), refetchInterval: 5000 })
@@ -109,7 +150,6 @@ export default function SyncPage() {
   if (error) return <ErrorState error={error} onRetry={refetch} />
   return (
     <div>
-      <PageHeader title="Synchronisation" description="Live status reported by your desktop apps, plus the full transfer history." icon={<RefreshCw className="size-5" />} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Active transfers" value={data.stats.active} icon={<ArrowUpFromLine className="size-5" />} tone="sky" />
         <Stat label="Completed (24h)" value={data.stats.completed_24h} sub={formatBytes(data.stats.bytes_24h)} icon={<CheckCircle2 className="size-5" />} tone="green" />

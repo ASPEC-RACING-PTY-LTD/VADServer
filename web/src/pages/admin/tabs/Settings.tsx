@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { errorMessage, get, put } from '../../../lib/api'
 import { formatBytes } from '../../../lib/format'
 import { Button, ErrorState, Field, PageLoader, Toggle, useUI } from '../../../components/ui'
-import { GB, QuotaInput } from './QuotaInput'
+import { QuotaInput } from './QuotaInput'
+import { SizeInput } from '../../../components/SizeInput'
 
 export default function SettingsTab() {
   const { toast } = useUI()
@@ -39,11 +40,11 @@ export default function SettingsTab() {
           <QuotaInput value={s.default_quota_bytes} onChange={(v) => setS((x: any) => ({ ...x, default_quota_bytes: v }))} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Maximum file size (GB, 0 = unlimited)">
-            <input className="input" type="number" min={0} step="any" value={+(s.max_file_bytes / GB).toFixed(2)} onChange={(e) => setS({ ...s, max_file_bytes: Math.round(Number(e.target.value) * GB) })} />
+          <Field label="Maximum file size (0 = unlimited)">
+            <SizeInput value={s.max_file_bytes} onChange={(v) => setS({ ...s, max_file_bytes: v })} />
           </Field>
-          <Field label="Always keep free on every disk (GB)" hint="Hard floor that protects the host from filling up.">
-            <input className="input" type="number" min={0} step="any" value={+(s.min_free_bytes / GB).toFixed(2)} onChange={(e) => setS({ ...s, min_free_bytes: Math.round(Number(e.target.value) * GB) })} />
+          <Field label="Always keep free on every disk" hint="Hard floor that protects the host from filling up.">
+            <SizeInput value={s.min_free_bytes} onChange={(v) => setS({ ...s, min_free_bytes: v })} />
           </Field>
           <Field label="Trash retention (days, 0 = keep)">
             <input className="input" type="number" min={0} value={s.trash_retention_days} onChange={num('trash_retention_days')} />

@@ -55,13 +55,14 @@ func TestReadinessAndBackupState(t *testing.T) {
 		t.Fatalf("bob empty: %+v", rep)
 	}
 
-	// A device with nothing reported: no jobs is critical, device inputs unknown.
+	// A device with nothing reported: backups are optional, so having no
+	// jobs is not a problem; device inputs are unknown.
 	rep := readinessOf(t, alice, "/api/v1/readiness")
-	if len(rep.Devices) != 1 || rep.Devices[0].DeviceID != dc.DeviceID || rep.Status != wire.ReadinessStatusCritical {
+	if len(rep.Devices) != 1 || rep.Devices[0].DeviceID != dc.DeviceID || rep.Status == wire.ReadinessStatusCritical {
 		t.Fatalf("fresh: %+v", rep)
 	}
 	d := rep.Devices[0]
-	if c := checkOf(t, d, wire.ReadinessCheckRecentBackup); c.Status != wire.ReadinessStatusCritical || c.FixLink == "" {
+	if c := checkOf(t, d, wire.ReadinessCheckRecentBackup); c.Status != wire.ReadinessStatusUnknown {
 		t.Fatalf("no jobs: %+v", c)
 	}
 	for _, id := range []string{wire.ReadinessCheckVSSAvailable, wire.ReadinessCheckRecoveryKeyConfirmed, wire.ReadinessCheckServiceInstalled, wire.ReadinessCheckInstallMode, wire.ReadinessCheckModulesHealthy} {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, Download, File as FileIcon, Folder, History } from 'lucide-react'
-import { Badge, Button, EmptyState, ErrorState, Modal, PageHeader, PageLoader } from '../../components/ui'
+import { Badge, Button, EmptyState, ErrorState, Modal, PageLoader } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { cancelRestore, downloadZip, executeRestore, listRestores, listSnapshots, listTree, planRestore, type PlanResponse, type RestorePlan, type Snapshot } from './api'
@@ -9,13 +9,18 @@ import { cancelRestore, downloadZip, executeRestore, listRestores, listSnapshots
 const fmtTime = (ms: number) => new Date(ms).toLocaleString()
 const isDir = (t: string) => t === 'dir' || t === 'd'
 
-/** Snapshots: browse, download as zip, or restore to a device (api-v1 rev 1.1c). */
-export default function RestorePage() {
+/** Snapshots: browse, download as zip, or restore to a device (api-v1 rev 1.1c); Sync > Backups & Restore. */
+export function RestorePanel() {
   const snaps = useQuery({ queryKey: ['restore', 'snapshots'], queryFn: listSnapshots })
   const [snap, setSnap] = useState<Snapshot | null>(null)
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Restore" description="Browse backup snapshots, download files, or restore them to a device." icon={<History className="size-5" />} />
+      <div>
+        <h2 className="flex items-center gap-2 font-semibold">
+          <History className="size-4" /> Restore
+        </h2>
+        <p className="text-sm text-slate-500">Browse backup snapshots, download files, or restore them to a device.</p>
+      </div>
       <RestoreList />
       {snaps.error ? (
         <ErrorState error={snaps.error} onRetry={() => void snaps.refetch()} />

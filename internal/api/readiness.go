@@ -233,7 +233,9 @@ func (ev readinessEval) device(f *store.ReadinessFacts) wire.ReadinessDevice {
 	return out
 }
 
-func jobsLink(f *store.ReadinessFacts) string { return fmt.Sprintf("/backups?device=%d", f.Device.ID) }
+func jobsLink(f *store.ReadinessFacts) string {
+	return fmt.Sprintf("/sync/backups?device=%d", f.Device.ID)
+}
 
 func (ev readinessEval) recentBackup(f *store.ReadinessFacts) wire.ReadinessCheck {
 	worst := check(wire.ReadinessCheckRecentBackup, wire.ReadinessStatusOK, "All backup jobs are up to date.", "")
@@ -262,7 +264,8 @@ func (ev readinessEval) recentBackup(f *store.ReadinessFacts) wire.ReadinessChec
 	case len(f.Jobs) > 0:
 		return check(wire.ReadinessCheckRecentBackup, wire.ReadinessStatusCritical, "All backup jobs are disabled.", jobsLink(f))
 	}
-	return check(wire.ReadinessCheckRecentBackup, wire.ReadinessStatusCritical, "No backup jobs are set up for this device.", jobsLink(f))
+	// Backups are optional: a device that only syncs is not at risk.
+	return check(wire.ReadinessCheckRecentBackup, wire.ReadinessStatusUnknown, "No backup jobs on this device (backups are optional).", "")
 }
 
 // jobFreshness compares a job's last successful backup with its schedule.

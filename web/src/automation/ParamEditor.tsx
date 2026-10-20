@@ -9,6 +9,7 @@ const units = [
   { label: 'KB', mult: 1024 },
   { label: 'MB', mult: 1024 ** 2 },
   { label: 'GB', mult: 1024 ** 3 },
+  { label: 'TB', mult: 1024 ** 4 },
 ]
 
 function BytesInput({ value, onChange }: { value: any; onChange: (v: number) => void }) {

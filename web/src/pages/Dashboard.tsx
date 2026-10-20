@@ -7,7 +7,7 @@ import { useUser } from '../lib/auth'
 import { formatBytes, pluralize, timeAgo } from '../lib/format'
 import { enabledWidgets, featureWidgets, type DashboardWidget } from '../lib/dashboardWidgets'
 import { useFeatureContext } from '../app/useFeatureContext'
-import { Button, ErrorState, PageHeader, PageLoader, ProgressBar, Stat } from '../components/ui'
+import { Button, ErrorState, PageHeader, PageLoader, Stat } from '../components/ui'
 import { FileIcon } from '../components/FileIcon'
 
 const kindColors: Record<string, string> = { video: 'bg-violet-500', image: 'bg-pink-500', document: 'bg-sky-500', audio: 'bg-teal-500', archive: 'bg-orange-500', other: 'bg-slate-400' }
@@ -42,42 +42,55 @@ function StorageWidget() {
   const used = data.usage.used_bytes as number
   const quota = data.usage.quota_bytes as number
   const byKind: Record<string, number> = data.files.bytes_by_kind ?? {}
-  const kinds = Object.entries(byKind).sort((a, b) => b[1] - a[1])
-  const totalKind = kinds.reduce((a, [, v]) => a + v, 0)
+  const kinds = Object.entries(byKind)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+  const kindTotal = kinds.reduce((a, [, v]) => a + v, 0)
+  // Usage not in a file kind: trash and kept versions.
+  const otherUsed = Math.max(0, used - kindTotal)
+  // Total: the quota, or what is used plus what is free on the server.
+  const free = quota > 0 ? Math.max(0, quota - used) : (data.device_available_bytes as number | undefined)
+  const total = quota > 0 ? quota : used + (free ?? 0)
+  const segments = [...kinds.map(([k, v]) => ({ key: k, label: kindLabels[k] ?? k, bytes: v, color: kindColors[k] ?? 'bg-slate-400', files: data.files.count_by_kind?.[k] ?? 0 }))]
+  if (otherUsed > 0) segments.push({ key: 'kept', label: 'Trash & versions', bytes: otherUsed, color: 'bg-slate-500', files: -1 })
+  const pct = (v: number) => (total > 0 ? (v / total) * 100 : 0)
   return (
-    <div className="card p-6">
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Storage overview</h2>
-        {quota > 0 && <span className="text-sm text-slate-500">{Math.round((used / quota) * 100)}% of quota</span>}
+    <div className="card p-5">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h2 className="text-base font-semibold">Storage</h2>
+        <span className="text-xs text-slate-500">
+          {formatBytes(used)} of {total > 0 ? formatBytes(total) : '-'}
+          {quota > 0 ? ' quota' : ''}
+        </span>
       </div>
-      {quota > 0 && <ProgressBar value={(used / quota) * 100} tone={used / quota > 0.9 ? 'red' : used / quota > 0.75 ? 'amber' : 'brand'} className="mb-6 h-3" />}
-      {totalKind > 0 ? (
-        <>
-          <div className="flex h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            {kinds.map(([k, v]) => (
-              <div key={k} className={kindColors[k]} style={{ width: `${(v / totalKind) * 100}%` }} title={`${kindLabels[k]}: ${formatBytes(v)}`} />
-            ))}
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {kinds.map(([k, v]) => (
-              <div key={k} className="flex items-center gap-3">
-                <span className={`size-3 rounded-full ${kindColors[k]}`} />
-                <div>
-                  <div className="text-sm font-medium">{kindLabels[k]}</div>
-                  <div className="text-xs text-slate-500">
-                    {formatBytes(v)} · {pluralize(data.files.count_by_kind[k] ?? 0, 'file')}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-slate-500">No files yet. Upload files in the browser or connect the desktop app to start syncing.</p>
-      )}
+      <div className="flex h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" role="img" aria-label={`${formatBytes(used)} used${free !== undefined ? `, ${formatBytes(free)} free` : ''}`}>
+        {segments.map((g) => (
+          <div key={g.key} className={g.color} style={{ width: `${pct(g.bytes)}%` }} title={`${g.label}: ${formatBytes(g.bytes)}`} />
+        ))}
+      </div>
+      <ul className="mt-4 space-y-2 text-sm">
+        {segments.map((g) => (
+          <li key={g.key} className="flex items-center gap-2.5">
+            <span className={`size-2.5 shrink-0 rounded-full ${g.color}`} />
+            <span className="min-w-0 flex-1 truncate">{g.label}</span>
+            <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+              {formatBytes(g.bytes)}
+              {g.files >= 0 && ` · ${pluralize(g.files, 'file')}`}
+            </span>
+          </li>
+        ))}
+        {free !== undefined && (
+          <li className="flex items-center gap-2.5">
+            <span className="size-2.5 shrink-0 rounded-full bg-slate-200 ring-1 ring-slate-300 dark:bg-slate-700 dark:ring-slate-600" />
+            <span className="min-w-0 flex-1 truncate">Free</span>
+            <span className="shrink-0 text-xs font-medium text-slate-600 tabular-nums dark:text-slate-300">{formatBytes(free)}</span>
+          </li>
+        )}
+      </ul>
+      {segments.length === 0 && <p className="mt-3 text-sm text-slate-500">No files yet. Upload files from Files or connect the desktop app.</p>}
       {data.files.trash_bytes > 0 && (
-        <p className="mt-5 text-xs text-slate-500">
-          Trash holds {formatBytes(data.files.trash_bytes)} that still counts towards your usage. <Link to="/trash" className="text-brand-600 hover:underline">Review trash</Link>
+        <p className="mt-4 text-xs text-slate-500">
+          Trash holds {formatBytes(data.files.trash_bytes)}. <Link to="/trash" className="text-brand-600 hover:underline">Review trash</Link>
         </p>
       )}
     </div>
@@ -90,7 +103,7 @@ function SyncWidget() {
   return (
     <div className="card p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Synchronisation</h2>
+        <h2 className="text-base font-semibold">Sync</h2>
         <Link to="/sync" className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
           Details <ArrowUpRight className="size-3" />
         </Link>
@@ -184,14 +197,14 @@ function AutomationWidget() {
 /** Built-in widgets: the original dashboard content. Feature widgets come from lib/dashboardWidgets. */
 const builtinWidgets: DashboardWidget[] = [
   { id: 'core.stats', order: 10, span: 3, component: StatsWidget },
-  { id: 'core.storage', order: 20, span: 2, component: StorageWidget },
+  { id: 'core.storage', order: 20, span: 1, component: StorageWidget },
   { id: 'core.sync', order: 30, component: SyncWidget },
   { id: 'core.recent', order: 40, span: 2, component: RecentWidget },
   { id: 'core.automation', order: 50, component: AutomationWidget },
 ]
 const allWidgets: readonly DashboardWidget[] = [...builtinWidgets, ...featureWidgets]
 
-const spanClass = { 1: '', 2: 'xl:col-span-2', 3: 'xl:col-span-3' } as const
+const spanClass = { 1: '', 2: 'md:col-span-2', 3: 'md:col-span-2 xl:col-span-3' } as const
 
 /** Keeps one broken widget from blanking the whole dashboard. */
 class WidgetBoundary extends Component<{ id: string; children: ReactNode }, { error: unknown }> {
@@ -229,7 +242,7 @@ export function DashboardPage() {
           </Link>
         }
       />
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {enabledWidgets(allWidgets, ctx).map((w) => (
           // `grid` stretches the widget's root card to the row height, as when the cards were grid items.
           <div key={w.id} className={`grid ${spanClass[w.span ?? 1]}`}>

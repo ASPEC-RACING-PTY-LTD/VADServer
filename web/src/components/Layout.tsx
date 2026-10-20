@@ -1,13 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, ChevronDown, HardDriveUpload, LogOut, Menu as MenuIcon, Moon, Search, Settings, ShieldAlert, Sun, UserCircle, X } from 'lucide-react'
+import { Bell, ChevronDown, HardDriveUpload, LogOut, Menu as MenuIcon, Moon, Search, ShieldAlert, Sun, UserCircle, X } from 'lucide-react'
 import { useAuth, useUser } from '../lib/auth'
 import { get, post } from '../lib/api'
 import { formatBytes, timeAgo } from '../lib/format'
 import { useUploads } from '../lib/uploads'
 import { Badge, cx, IconButton, Menu, PageLoader, ProgressBar } from './ui'
 import { navEntries } from '../app/registry'
+import { readOpenSections, writeOpenSections, type NavSection } from '../lib/navState'
 import { useFeatureContext, useFeatureFlags } from '../app/useFeatureContext'
 
 function Logo({ name }: { name: string }) {
@@ -83,12 +84,13 @@ function Notifications() {
 
 function UploadIndicator() {
   const { items } = useUploads()
+  const loc = useLocation()
   const active = items.filter((i) => ['queued', 'uploading', 'finalizing'].includes(i.status))
   if (!active.length) return null
   const total = active.reduce((a, i) => a + i.file.size, 0)
   const sent = active.reduce((a, i) => a + i.sent, 0)
   return (
-    <Link to="/uploads" className="hidden items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 md:flex dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+    <Link to={`${loc.pathname.startsWith('/files') ? loc.pathname : '/files'}?uploads=1`} className="hidden items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 md:flex dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
       <HardDriveUpload className="size-4 text-brand-500" />
       <span>{active.length} uploading</span>
       <ProgressBar value={total ? (sent / total) * 100 : 0} className="w-20" />
@@ -141,6 +143,24 @@ export function Layout({ children }: { children: ReactNode }) {
   const featureCtx = useFeatureContext()
   const mainNav = navEntries(featureCtx, 'main')
   const adminNav = navEntries(featureCtx, 'admin')
+  // Collapsible sidebar sections: Management starts closed; it opens by itself on its own pages
+  // and stays as the user left it (lib/navState.ts).
+  const [openSections, setOpenSections] = useState(readOpenSections)
+  const onManagementPage = adminNav.some((n) => loc.pathname === n.to || loc.pathname.startsWith(n.to + '/'))
+  const managementOpen = !!openSections.management
+  const toggleSection = (s: NavSection) => {
+    const next = { ...openSections, [s]: !openSections[s] }
+    setOpenSections(next)
+    writeOpenSections(next)
+  }
+  // Opening one of its pages (a link, or a refresh while on it) opens the section.
+  useEffect(() => {
+    if (onManagementPage && !readOpenSections().management) {
+      const next = { ...readOpenSections(), management: true }
+      setOpenSections(next)
+      writeOpenSections(next)
+    }
+  }, [onManagementPage])
   // Hold page content until the server flags are known, so a deep link to a flag-gated page
   // isn't redirected by the catch-all route while /info is still loading.
   const { ready: flagsReady } = useFeatureFlags()
@@ -158,8 +178,16 @@ export function Layout({ children }: { children: ReactNode }) {
         ))}
         {adminNav.length > 0 && (
           <>
-            <div className="mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Administration</div>
-            {adminNav.map((n) => (
+            <button
+              type="button"
+              onClick={() => toggleSection('management')}
+              aria-expanded={managementOpen}
+              className="mt-4 mb-1 flex items-center justify-between rounded-md px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              Management
+              <ChevronDown className={cx('size-3.5 transition', !managementOpen && '-rotate-90')} />
+            </button>
+            {managementOpen && adminNav.map((n) => (
               <NavLink key={n.id} to={n.to} end={n.end} className={({ isActive }) => cx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition', isActive ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/70')}>
                 <n.icon className="size-[18px]" />
                 {n.label}
@@ -230,14 +258,13 @@ export function Layout({ children }: { children: ReactNode }) {
               )}
               items={[
                 { label: 'Account settings', icon: <UserCircle className="size-4" />, onClick: () => navigate('/account') },
-                ...(user.role === 'admin' ? [{ label: 'Admin console', icon: <Settings className="size-4" />, onClick: () => navigate('/admin') }] : []),
                 'divider',
                 { label: 'Sign out', icon: <LogOut className="size-4" />, onClick: logout, danger: true },
               ]}
             />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-[1920px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <PendingDevicesBanner />
           {flagsReady ? children : <PageLoader />}
         </main>

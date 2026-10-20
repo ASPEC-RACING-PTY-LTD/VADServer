@@ -6,6 +6,7 @@ import { Button, ErrorState, Field, Modal, PageLoader, Toggle, useUI } from '../
 import { LocationBar } from '../LocationBar'
 import { GB } from './QuotaInput'
 import { StorageCompression } from './StorageCompression'
+import { SizeInput } from '../../../components/SizeInput'
 
 export default function StorageTab() {
   const qc = useQueryClient()
@@ -89,10 +90,7 @@ export default function StorageTab() {
             <input className="input font-mono" value={form.path} onChange={(e) => setForm({ ...form, path: e.target.value })} />
           </Field>
           <Field label="Keep free (reserve)" hint="Uploads are refused when free space would drop below this.">
-            <div className="flex items-center gap-2">
-              <input className="input" type="number" min={0} value={+(form.reserve_bytes / GB).toFixed(2)} onChange={(e) => setForm({ ...form, reserve_bytes: Math.round(Number(e.target.value) * GB) })} />
-              <span className="text-sm text-slate-500">GB</span>
-            </div>
+            <SizeInput value={form.reserve_bytes ?? 0} onChange={(v) => setForm({ ...form, reserve_bytes: v })} />
           </Field>
           <Toggle checked={form.is_default} onChange={(v) => setForm({ ...form, is_default: v })} label="Use for new users by default" />
         </div>
@@ -115,10 +113,7 @@ export default function StorageTab() {
             <input className="input" value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
           <Field label="Keep free (reserve)">
-            <div className="flex items-center gap-2">
-              <input className="input" type="number" min={0} value={+((form.reserve_bytes ?? 0) / GB).toFixed(2)} onChange={(e) => setForm({ ...form, reserve_bytes: Math.round(Number(e.target.value) * GB) })} />
-              <span className="text-sm text-slate-500">GB</span>
-            </div>
+            <SizeInput value={form.reserve_bytes ?? 0} onChange={(v) => setForm({ ...form, reserve_bytes: v })} />
           </Field>
           <Toggle checked={!!form.enabled} disabled={editing?.is_default} onChange={(v) => setForm({ ...form, enabled: v })} label="Accept new uploads" description="Disabled locations still serve existing files." />
           <Toggle checked={!!form.is_default} disabled={editing?.is_default} onChange={(v) => setForm({ ...form, is_default: v })} label="Default location for new users" />

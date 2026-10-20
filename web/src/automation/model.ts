@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { Edge as RFEdge, Node as RFNode } from '@xyflow/react'
 import { get } from '../lib/api'
+import { formatBytes } from '../lib/format'
 
 export const SCHEMA_ID = 'vaultdock.automation/v1'
 
@@ -117,7 +118,7 @@ export function autoLayout(a: Automation): Record<string, { x: number; y: number
 
 export function summarize(n: ANode, spec?: KindSpec): string {
   const p = n.params ?? {}
-  const fmtBytes = (v: number) => (v >= 1 << 30 ? `${(v / (1 << 30)).toFixed(1)} GB` : v >= 1 << 20 ? `${(v / (1 << 20)).toFixed(1)} MB` : v >= 1024 ? `${(v / 1024).toFixed(0)} KB` : `${v} B`)
+  const fmtBytes = (v: number) => formatBytes(v)
   const ops: Record<string, string> = { gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=' }
   const neg = p.negate ? 'NOT ' : ''
   switch (n.kind) {

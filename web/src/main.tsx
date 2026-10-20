@@ -8,6 +8,7 @@ import { AuthProvider } from './lib/auth'
 import { UIProvider } from './components/ui'
 import { UploadProvider } from './lib/uploads'
 import { ApiError } from './lib/api'
+import { resetOnHardReload } from './lib/navState'
 
 // Theme: explicit choice in localStorage, otherwise follow the system.
 const applyTheme = () => {
@@ -16,6 +17,7 @@ const applyTheme = () => {
   document.documentElement.classList.toggle('dark', dark)
 }
 applyTheme()
+resetOnHardReload()
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme)
 
 const queryClient = new QueryClient({

@@ -23,7 +23,7 @@ export default function RunPage() {
         title={`Run #${r.id}`}
         description={
           <>
-            <Link to="/backups" className="hover:underline">
+            <Link to="/sync/backups" className="hover:underline">
               Backups
             </Link>{' '}
             ·{' '}

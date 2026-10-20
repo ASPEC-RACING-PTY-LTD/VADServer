@@ -8,7 +8,7 @@ const tab = (over: Partial<AdminTab>): AdminTab => ({ id: 'x', label: 'X', icon:
 
 describe('admin tabs registry', () => {
   it('keeps the built-in tab order and URLs', () => {
-    expect(enabledAdminTabs(coreAdminTabs, ctx()).map(tabPath)).toEqual(['', 'users', 'storage', 'devices', 'transfers', 'settings', 'health', 'updates', 'audit'])
+    expect(enabledAdminTabs(coreAdminTabs, ctx()).map(tabPath)).toEqual(['', 'users', 'storage', 'devices', 'transfers', 'settings', 'updates', 'audit'])
   })
 
   it('has unique ids and paths', () => {

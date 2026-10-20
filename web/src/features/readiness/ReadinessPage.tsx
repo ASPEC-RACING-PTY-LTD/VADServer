@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { Gauge, HardDriveDownload, Monitor } from 'lucide-react'
-import { Badge, Button, EmptyState, ErrorState, PageHeader, PageLoader, cx } from '../../components/ui'
+import { Badge, Button, EmptyState, ErrorState, PageLoader, cx } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { formatDate, pluralize, timeAgo } from '../../lib/format'
 import { useAllJobs, useDevices } from '../backups/api'
@@ -27,12 +27,15 @@ function useIsAdmin(): boolean {
   return state.status === 'authenticated' && state.user.role === 'admin'
 }
 
-/** `/readiness`: per-device checks (worst first) and per-job freshness, filterable by `?device=` and `?scope=all` (admins). */
-export default function ReadinessPage() {
+/**
+ * Backup readiness of every device (Administration > Overview): per-device checks, worst first,
+ * and per-job freshness. Backups are optional; a device without backup jobs is not a problem.
+ */
+export function ReadinessPanel() {
   const [params, setParams] = useSearchParams()
   const isAdmin = useIsAdmin()
   const device = Number(params.get('device')) || undefined
-  const scope = isAdmin && params.get('scope') === 'all' ? 'all' : 'mine'
+  const scope = isAdmin ? 'all' : 'mine'
   const q = useReadiness({ device, scope })
   const devices = useDevices()
   const jobs = useAllJobs()
@@ -50,34 +53,24 @@ export default function ReadinessPage() {
   const counts = countDevices(q.data)
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Readiness"
-        description="Can each device be restored right now? Problems are listed worst first, with a link to fix them."
-        icon={<Gauge className="size-6" />}
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            {device ? (
-              <Button size="sm" onClick={() => setParam('device', null)}>
-                Show all devices
-              </Button>
-            ) : null}
-            {isAdmin && !device && (
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <input type="checkbox" checked={scope === 'all'} onChange={(e) => setParam('scope', e.target.checked ? 'all' : null)} />
-                All users
-              </label>
-            )}
-          </div>
-        }
-      />
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 font-semibold">
+          <Gauge className="size-4" /> Backup readiness
+        </h3>
+        {device ? (
+          <Button size="sm" onClick={() => setParam('device', null)}>
+            Show all devices
+          </Button>
+        ) : null}
+      </div>
       {q.error ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : q.isPending ? (
         <PageLoader label="Loading readiness" />
       ) : (
         <>
-          <section aria-label="Overall readiness" className="card flex flex-wrap items-center gap-6 p-6">
+          <section aria-label="Overall readiness" className="card flex flex-wrap items-center gap-6 p-5">
             <div className="flex items-center gap-3">
               <StatusIcon status={q.data.status} className="size-8" />
               <div>
@@ -102,13 +95,17 @@ export default function ReadinessPage() {
               title="No devices to check"
               description="Readiness is reported for approved devices. Approve a device and create a backup job to see it here."
               action={
-                <Link to="/devices" className={linkClass}>
+                <Link to="/admin/devices" className={linkClass}>
                   Open Devices
                 </Link>
               }
             />
           ) : (
-            list.map((d) => <DeviceCard key={d.device_id} device={d} name={deviceName.get(d.device_id)} jobName={jobName} />)
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              {list.map((d) => (
+                <DeviceCard key={d.device_id} device={d} name={deviceName.get(d.device_id)} jobName={jobName} />
+              ))}
+            </div>
           )}
         </>
       )}
@@ -122,7 +119,7 @@ function DeviceCard({ device, name, jobName }: { device: ReadinessDevice; name?:
   const checks = sortChecks(device.checks)
   const jobs = device.jobs ?? []
   return (
-    <section aria-label={title} className="card p-6">
+    <section aria-label={title} className="card p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
           <StatusIcon status={status} />
@@ -130,10 +127,10 @@ function DeviceCard({ device, name, jobName }: { device: ReadinessDevice; name?:
           <StatusBadge status={status} />
         </h2>
         <div className="flex gap-3 text-sm">
-          <Link to={`/backups?device=${device.device_id}`} className={linkClass}>
+          <Link to={`/sync/backups?device=${device.device_id}`} className={linkClass}>
             Backups
           </Link>
-          <Link to={`/devices?device=${device.device_id}`} className={linkClass}>
+          <Link to={`/admin/devices?device=${device.device_id}`} className={linkClass}>
             Device
           </Link>
         </div>

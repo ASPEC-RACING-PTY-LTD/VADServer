@@ -1,10 +1,10 @@
 import { lazy } from 'react'
-import { Activity, FolderOpen, HardDriveUpload, LayoutDashboard, Monitor, RefreshCw, Shield, Trash2, Workflow } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
+import { Activity, ArrowUpCircle, FolderOpen, HardDrive, LayoutDashboard, Monitor, RefreshCw, Shield, ShieldCheck, Trash2, Users, Workflow } from 'lucide-react'
 import { DashboardPage } from '../pages/Dashboard'
 import { FilesPage } from '../pages/Files'
 import type { FeatureModule } from './types'
 
-const UploadsPage = lazy(() => import('../pages/Uploads'))
 const SyncPage = lazy(() => import('../pages/Sync'))
 const DevicesPage = lazy(() => import('../pages/Devices'))
 const AutomationsPage = lazy(() => import('../pages/Automations'))
@@ -25,8 +25,16 @@ export const coreModules: FeatureModule[] = [
     ],
     nav: { label: 'Files', icon: FolderOpen, order: 20 },
   },
-  { id: 'uploads', routes: [{ path: '/uploads', component: UploadsPage }], nav: { label: 'Uploads', icon: HardDriveUpload, order: 30 } },
-  { id: 'sync', routes: [{ path: '/sync', component: SyncPage }], nav: { label: 'Synchronisation', icon: RefreshCw, order: 40 } },
+  // Uploads moved into Files (the Uploads dialog); old links land there.
+  { id: 'uploads', routes: [{ path: '/uploads', component: () => <Navigate to="/files?uploads=1" replace /> }] },
+  {
+    id: 'sync',
+    routes: [
+      { path: '/sync', component: SyncPage },
+      { path: '/sync/:tab', component: SyncPage },
+    ],
+    nav: { label: 'Sync', icon: RefreshCw, order: 40 },
+  },
   { id: 'devices', routes: [{ path: '/devices', component: DevicesPage }], nav: { label: 'Devices', icon: Monitor, order: 50 } },
   {
     id: 'automations',
@@ -40,5 +48,12 @@ export const coreModules: FeatureModule[] = [
   { id: 'activity', routes: [{ path: '/activity', component: ActivityPage }], nav: { label: 'Activity', icon: Activity, order: 70 } },
   { id: 'trash', routes: [{ path: '/trash', component: TrashPage }], nav: { label: 'Trash', icon: Trash2, order: 80 } },
   { id: 'account', routes: [{ path: '/account', component: AccountPage }] },
-  { id: 'admin', adminOnly: true, routes: [{ path: '/admin/*', component: AdminPage }], nav: { label: 'Admin console', icon: Shield, to: '/admin', order: 10, section: 'admin' } },
+  // Management: Administration (the console's remaining tabs) and the console pages used most,
+  // linked straight from the sidebar (their tabs are hidden in the console, see tabs/registry.ts).
+  { id: 'admin', adminOnly: true, routes: [{ path: '/admin/*', component: AdminPage }], nav: { label: 'Administration', icon: Shield, to: '/admin', order: 10, section: 'admin', end: true } },
+  { id: 'admin-users', adminOnly: true, routes: [], nav: { label: 'Users', icon: Users, to: '/admin/users', order: 20, section: 'admin' } },
+  { id: 'admin-devices', adminOnly: true, routes: [], nav: { label: 'Devices', icon: Monitor, to: '/admin/devices', order: 30, section: 'admin' } },
+  { id: 'admin-storage', adminOnly: true, routes: [], nav: { label: 'Storage', icon: HardDrive, to: '/admin/storage', order: 40, section: 'admin' } },
+  { id: 'admin-updates', adminOnly: true, routes: [], nav: { label: 'Updates', icon: ArrowUpCircle, to: '/admin/updates', order: 50, section: 'admin' } },
+  { id: 'admin-audit', adminOnly: true, routes: [], nav: { label: 'Audit log', icon: ShieldCheck, to: '/admin/audit', order: 60, section: 'admin' } },
 ]

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { UIProvider } from '../../../components/ui'
-import JobsPage from '../JobsPage'
+import { BackupJobsPanel } from '../JobsPage'
 import JobPage from '../JobPage'
 import RunPage from '../RunPage'
 import { BackupStatusWidget } from '../dashboard'
@@ -103,7 +103,7 @@ function renderAt(path: string) {
       <UIProvider>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
-            <Route path="/backups" element={<JobsPage />} />
+            <Route path="/backups" element={<BackupJobsPanel />} />
             <Route path="/backups/jobs/:id" element={<JobPage />} />
             <Route path="/backups/runs/:id" element={<RunPage />} />
             <Route path="/" element={<BackupStatusWidget />} />
@@ -116,7 +116,7 @@ function renderAt(path: string) {
 
 const writes = () => calls.filter((c) => c.method !== 'GET')
 
-describe('JobsPage', () => {
+describe('BackupJobsPanel', () => {
   it('lists jobs per device with state, suspension reason and actions', async () => {
     renderAt('/backups')
     const table = await screen.findByRole('table', { name: 'Backup jobs on LAPTOP-1' })

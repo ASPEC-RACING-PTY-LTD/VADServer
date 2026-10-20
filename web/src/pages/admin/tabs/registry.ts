@@ -9,17 +9,16 @@
  * wraps the tab routes in Suspense.
  *
  * Built-in tabs use orders 10 (Overview), 20 (Users), 30 (Storage), 40 (Devices), 50 (Transfers),
- * 60 (Settings), 70 (System health), 80 (Updates), 90 (Audit log); pick in-between values to slot
+ * 60 (Settings), 80 (Updates), 90 (Audit log); pick in-between values to slot
  * in (for example 35 for a storage-related tab). Ids and paths must be unique (DEV logs duplicates).
  */
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, ArrowUpCircle, Cpu, HardDrive, Monitor, RefreshCw, Settings, Shield, Users } from 'lucide-react'
+import { Activity, ArrowUpCircle, HardDrive, Monitor, RefreshCw, Settings, Shield, Users } from 'lucide-react'
 import type { FeatureContext } from '../../../app/types'
 import { UpdatesTab } from '../Updates'
 import AuditTab from './Audit'
 import DevicesTab from './Devices'
-import HealthTab from './Health'
 import OverviewTab from './Overview'
 import SettingsTab from './Settings'
 import StorageTab from './Storage'
@@ -41,6 +40,8 @@ export interface AdminTab {
   superuserOnly?: boolean
   /** Hidden unless this flag is in the active feature-flag set. */
   requiredFeatureFlag?: string
+  /** Linked from the sidebar's Management section instead of the console's tab bar. */
+  inSidebar?: boolean
 }
 
 /** Visibility context for admin tabs. The console itself is only reachable by admins. */
@@ -54,14 +55,13 @@ export interface AdminTabContext extends FeatureContext {
 
 export const coreAdminTabs: readonly AdminTab[] = [
   { id: 'overview', path: '', label: 'Overview', icon: Activity, order: 10, component: OverviewTab },
-  { id: 'users', label: 'Users', icon: Users, order: 20, component: UsersTab },
-  { id: 'storage', label: 'Storage', icon: HardDrive, order: 30, component: StorageTab },
-  { id: 'devices', label: 'Devices', icon: Monitor, order: 40, component: DevicesTab },
+  { id: 'users', label: 'Users', icon: Users, order: 20, component: UsersTab, inSidebar: true },
+  { id: 'storage', label: 'Storage', icon: HardDrive, order: 30, component: StorageTab, inSidebar: true },
+  { id: 'devices', label: 'Devices', icon: Monitor, order: 40, component: DevicesTab, inSidebar: true },
   { id: 'transfers', label: 'Transfers', icon: RefreshCw, order: 50, component: TransfersTab },
   { id: 'settings', label: 'Settings', icon: Settings, order: 60, component: SettingsTab },
-  { id: 'health', label: 'System health', icon: Cpu, order: 70, component: HealthTab },
-  { id: 'updates', label: 'Updates', icon: ArrowUpCircle, order: 80, component: UpdatesTab },
-  { id: 'audit', label: 'Audit log', icon: Shield, order: 90, component: AuditTab },
+  { id: 'updates', label: 'Updates', icon: ArrowUpCircle, order: 80, component: UpdatesTab, inSidebar: true },
+  { id: 'audit', label: 'Audit log', icon: Shield, order: 90, component: AuditTab, inSidebar: true },
 ]
 
 type TabExport = AdminTab | AdminTab[] | undefined

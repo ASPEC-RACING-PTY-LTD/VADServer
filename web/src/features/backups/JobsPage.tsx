@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { HardDriveDownload, Plus } from 'lucide-react'
-import { Badge, Button, EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui'
+import { Badge, Button, EmptyState, ErrorState, PageLoader } from '../../components/ui'
 import { DataTable, type Column } from '../../components/data/DataTable'
 import { infiniteTableProps } from '../../components/data/infinite'
 import { describeSchedule } from '../../components/ScheduleEditor'
@@ -8,22 +8,23 @@ import { useDevices, useJobs } from './api'
 import { kindLabel, modeLabels, type DeviceLite, type Job, type JobMode } from './types'
 import { JobActions, JobStateBadge, suspensionReason, useJobActions } from './shared'
 
-/** Backup jobs (api-v1 §6), one table per device. */
-export default function JobsPage() {
+/** Backup jobs (api-v1 §6), one table per device (Sync > Backups & Restore). */
+export function BackupJobsPanel() {
   const navigate = useNavigate()
   const devices = useDevices()
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Backups"
-        description="Backup jobs per device. Runs start on schedule or when you choose Run now."
-        icon={<HardDriveDownload className="size-5" />}
-        actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => navigate('/backups/jobs/new')}>
-            New job
-          </Button>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <HardDriveDownload className="size-4" /> Backup jobs
+          </h2>
+          <p className="text-sm text-slate-500">Optional. Runs start on schedule or when you choose Run now.</p>
+        </div>
+        <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => navigate('/backups/jobs/new')}>
+          New job
+        </Button>
+      </div>
       {devices.error ? (
         <ErrorState error={devices.error} onRetry={() => void devices.refetch()} />
       ) : devices.isPending ? (

@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { UIProvider } from '../../../components/ui'
-import ReadinessPage from '../ReadinessPage'
-import { ReadinessWidget } from '../dashboard'
+import { ReadinessPanel } from '../ReadinessPage'
 import { readinessPath } from '../api'
 import { checkLabel, countChecks, countDevices, deviceStatus, safeFixLink, sortChecks, type ReadinessReport } from '../types'
 
@@ -69,8 +68,7 @@ function renderAt(path: string) {
       <UIProvider>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
-            <Route path="/readiness" element={<ReadinessPage />} />
-            <Route path="/" element={<ReadinessWidget />} />
+            <Route path="/admin" element={<ReadinessPanel />} />
           </Routes>
         </MemoryRouter>
       </UIProvider>
@@ -116,9 +114,9 @@ describe('readiness helpers', () => {
   })
 })
 
-describe('ReadinessPage', () => {
+describe('ReadinessPanel', () => {
   it('shows the score, devices worst first, checks with fix links and jobs', async () => {
-    renderAt('/readiness')
+    renderAt('/admin')
     expect(await screen.findByTestId('readiness-score')).toHaveTextContent('67%')
     expect(readinessCalls()[0].url).toBe('/api/v1/readiness')
     const laptop = await screen.findByRole('region', { name: 'LAPTOP-1' })
@@ -130,8 +128,8 @@ describe('ReadinessPage', () => {
     // ok checks get no fix link
     expect(within(laptop).queryByRole('link', { name: 'Fix: Recent backup' })).not.toBeInTheDocument()
     expect(within(laptop).getByText('Info')).toBeInTheDocument()
-    expect(within(laptop).getByRole('link', { name: 'Backups' })).toHaveAttribute('href', '/backups?device=1')
-    expect(within(laptop).getByRole('link', { name: 'Device' })).toHaveAttribute('href', '/devices?device=1')
+    expect(within(laptop).getByRole('link', { name: 'Backups' })).toHaveAttribute('href', '/sync/backups?device=1')
+    expect(within(laptop).getByRole('link', { name: 'Device' })).toHaveAttribute('href', '/admin/devices?device=1')
     expect(await within(laptop).findByRole('link', { name: 'Documents' })).toHaveAttribute('href', '/backups/jobs/3')
 
     const other = screen.getByRole('region', { name: 'Device #2' })
@@ -141,50 +139,23 @@ describe('ReadinessPage', () => {
   })
 
   it('passes ?device= through', async () => {
-    renderAt('/readiness?device=1')
+    renderAt('/admin?device=1')
     await screen.findByTestId('readiness-score')
     expect(readinessCalls()[0].url).toBe('/api/v1/readiness?device=1')
     expect(screen.getByRole('button', { name: 'Show all devices' })).toBeInTheDocument()
   })
 
-  it('lets admins switch to all users', async () => {
+  it("shows every user's devices to admins", async () => {
     role = 'admin'
-    renderAt('/readiness')
+    renderAt('/admin')
     await screen.findByTestId('readiness-score')
-    fireEvent.click(screen.getByLabelText('All users'))
-    await waitFor(() => expect(readinessCalls().some((c) => c.url === '/api/v1/readiness?scope=all')).toBe(true))
-  })
-
-  it('hides the all-users toggle from non-admins', async () => {
-    renderAt('/readiness?scope=all')
-    await screen.findByTestId('readiness-score')
-    expect(screen.queryByLabelText('All users')).not.toBeInTheDocument()
-    expect(readinessCalls()[0].url).toBe('/api/v1/readiness')
+    expect(readinessCalls()[0].url).toBe('/api/v1/readiness?scope=all')
   })
 
   it('shows an empty state without devices', async () => {
     readinessReply = { status: 200, body: { score: 0, status: 'unknown', devices: [] } }
-    renderAt('/readiness')
+    renderAt('/admin')
     expect(await screen.findByText('No devices to check')).toBeInTheDocument()
     expect(screen.getByTestId('readiness-score')).toHaveTextContent('–')
-  })
-})
-
-describe('ReadinessWidget', () => {
-  it('shows overall status and counts', async () => {
-    renderAt('/')
-    expect(await screen.findByLabelText('Readiness score')).toHaveTextContent('67%')
-    expect(screen.getByText('Critical', { selector: 'span' })).toBeInTheDocument()
-    expect(screen.getByTestId('readiness-devices-critical')).toHaveTextContent('1')
-    expect(screen.getByTestId('readiness-devices-warning')).toHaveTextContent('1')
-    expect(screen.getByTestId('readiness-devices-ok')).toHaveTextContent('0')
-    expect(screen.getByText(/2 devices · 1 critical and 1 warning checks/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'View all' })).toHaveAttribute('href', '/readiness')
-  })
-
-  it('shows errors', async () => {
-    readinessReply = { status: 500, body: { error: { code: 'internal', message: 'boom' } } }
-    renderAt('/')
-    expect(await screen.findByText(/boom/)).toBeInTheDocument()
   })
 })

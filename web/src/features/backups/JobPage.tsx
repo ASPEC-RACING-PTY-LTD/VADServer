@@ -27,7 +27,7 @@ function NewJob() {
     <div className="flex flex-col gap-6">
       <PageHeader title="New backup job" icon={<HardDriveDownload className="size-5" />} />
       <div className="card p-6">
-        <JobEditor deviceId={device} onSaved={(j) => navigate(`/backups/jobs/${j.id}`, { replace: true })} onCancel={() => navigate('/backups')} />
+        <JobEditor deviceId={device} onSaved={(j) => navigate(`/backups/jobs/${j.id}`, { replace: true })} onCancel={() => navigate('/sync/backups')} />
       </div>
     </div>
   )
@@ -70,7 +70,7 @@ function JobDetail({ id }: { id: number }) {
     try {
       await del.mutateAsync(job.id)
       toast('success', 'Job deleted')
-      navigate('/backups')
+      navigate('/sync/backups')
     } catch (e) {
       setErr(jobErrorView(e))
     }
@@ -82,7 +82,7 @@ function JobDetail({ id }: { id: number }) {
         title={job.name}
         description={
           <>
-            <Link to="/backups" className="hover:underline">
+            <Link to="/sync/backups" className="hover:underline">
               Backups
             </Link>{' '}
             · {kindLabel(job.kind)} · {modeLabels[job.mode as JobMode] ?? job.mode}

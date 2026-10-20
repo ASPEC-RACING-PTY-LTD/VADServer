@@ -26,7 +26,7 @@ export function BackupStatusWidget() {
           Backups
           {jobs.data && runs.data && <Badge tone={failing ? 'red' : 'green'}>{failing ? `${failing} failing` : 'all OK'}</Badge>}
         </h2>
-        <Link to="/backups" className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
+        <Link to="/sync/backups" className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">
           View all
         </Link>
       </div>
