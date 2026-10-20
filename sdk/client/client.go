@@ -492,6 +492,7 @@ type Me struct {
 		ID          int64  `json:"id"`
 		Username    string `json:"username"`
 		DisplayName string `json:"display_name"`
+		Role        string `json:"role,omitempty"` // "admin" or "user"
 		QuotaBytes  int64  `json:"quota_bytes"`
 		UsedBytes   int64  `json:"used_bytes"`
 	} `json:"user"`

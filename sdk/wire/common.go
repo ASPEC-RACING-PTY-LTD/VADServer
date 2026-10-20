@@ -76,6 +76,10 @@ const (
 	// FeatureDirectUpload: a device may verify a direct (LAN) address of the
 	// server with POST /devices/direct-probe and send its uploads there.
 	FeatureDirectUpload = "upload.direct"
+	// FeatureDeferredFinish: POST /uploads/{id}/complete with
+	// "X-VD-Finalize: defer" queues the finish and answers 202 without
+	// waiting; POST /uploads/results reports the outcomes later.
+	FeatureDeferredFinish = "upload.deferred_finish"
 )
 
 // List limits for ?cursor=&limit= (api-v1 §1).

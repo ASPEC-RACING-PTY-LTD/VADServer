@@ -650,6 +650,7 @@ var knownFeatures = []string{
 	wire.FeatureVersions, wire.FeatureSyncTwoWay, wire.FeatureProfiles, wire.FeatureModules,
 	wire.FeatureDestinations, wire.FeatureAI, wire.FeatureDeployEnv, wire.FeatureRestore,
 	wire.FeatureUploadZstd, wire.FeatureUploadCompressedFlag, wire.FeatureDirectUpload,
+	wire.FeatureDeferredFinish,
 }
 
 var (
@@ -832,6 +833,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 
 			r.Post("/uploads", s.handleUploadCreate)
 			r.Get("/uploads", s.handleUploadList)
+			r.Post("/uploads/results", s.handleUploadResults)
 			r.Get("/uploads/{id}", s.handleUploadGet)
 			r.Put("/uploads/{id}/chunks/{index}", s.handleUploadChunk)
 			r.Post("/uploads/{id}/complete", s.handleUploadComplete)

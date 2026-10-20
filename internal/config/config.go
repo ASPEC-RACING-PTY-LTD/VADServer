@@ -153,7 +153,7 @@ func Load() (*Config, error) {
 		}
 		c.TrustedProxies = append(c.TrustedProxies, pref.Masked())
 	}
-	n, err := envInt("VAULTDOCK_MAX_CONCURRENT_CHUNKS", 64)
+	n, err := envInt("VAULTDOCK_MAX_CONCURRENT_CHUNKS", 128)
 	if err != nil {
 		return nil, err
 	}

@@ -421,3 +421,23 @@ func truncate(s string, n int) string {
 	}
 	return s
 }
+
+// TransferForUpload returns the transfer record of a user's upload session
+// (kept after the session itself is cleaned up).
+func (s *Store) TransferForUpload(ctx context.Context, userID int64, uploadID string) (*Transfer, error) {
+	var t Transfer
+	var fin sql.NullInt64
+	err := s.DB.QueryRowContext(ctx, "SELECT id, status, error, finished_at FROM transfers WHERE user_id = ? AND upload_id = ? ORDER BY id DESC LIMIT 1", userID, uploadID).
+		Scan(&t.ID, &t.Status, &t.Error, &fin)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if fin.Valid {
+		t.FinishedAt = &fin.Int64
+	}
+	t.UploadID = uploadID
+	return &t, nil
+}

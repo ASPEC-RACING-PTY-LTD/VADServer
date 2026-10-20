@@ -461,7 +461,7 @@ func (s *Server) handleDeviceMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"device":   s.deviceView(r.Context(), p.Device),
 		"features": features(),
-		"user":     map[string]any{"id": u.ID, "username": u.Username, "display_name": u.DisplayName, "quota_bytes": u.QuotaBytes, "used_bytes": u.UsedBytes},
+		"user":     map[string]any{"id": u.ID, "username": u.Username, "display_name": u.DisplayName, "role": u.Role, "quota_bytes": u.QuotaBytes, "used_bytes": u.UsedBytes},
 		"server":   map[string]any{"version": Version, "chunk_size": s.cfg.ChunkSize, "max_file_bytes": s.settings.Get().MaxFileBytes, "max_concurrent_chunks": s.cfg.MaxConcurrentChunkWrites, "site_name": s.settings.Get().SiteName},
 	})
 }

@@ -12,3 +12,7 @@ func HoldFinalize(wait time.Duration, hold <-chan struct{}) func() {
 	finalizeWait, beforeFinalize = wait, func() { <-hold }
 	return func() { finalizeWait, beforeFinalize = prevWait, prevHook }
 }
+
+// StreamHashHits returns how many finishes used the hash computed while the
+// upload arrived.
+func StreamHashHits() int64 { return streamHashHits.Load() }

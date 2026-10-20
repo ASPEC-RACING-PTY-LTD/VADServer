@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/compress"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-client/sdk/wire"
 )
 
 type UploadRequest struct {
@@ -292,4 +293,33 @@ func (c *Client) PutChunkCompressed(ctx context.Context, id string, idx int64, r
 	req.Header.Set("X-Chunk-Raw-Length", strconv.FormatInt(length, 10))
 	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(wrap(bytes.NewReader(body))), nil }
 	return true, c.send(req, nil)
+}
+
+// FinishLater asks the server to finish an upload without waiting for it
+// (wire.FeatureDeferredFinish); UploadResults reports the outcome later. A
+// dropped request is retried: a repeat joins the queued finish.
+func (c *Client) FinishLater(ctx context.Context, id string) (*UploadResult, error) {
+	hdr := http.Header{"X-Vd-Finalize": {"defer"}}
+	for dropped := 0; ; dropped++ {
+		var out UploadResult
+		_, err := c.doStatus(ctx, "POST", "/api/v1/uploads/"+id+"/complete", nil, &out, true, hdr)
+		if err == nil || dropped >= finishRetries || !finishDropped(ctx, err) {
+			return &out, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(dropped+1) * finishPoll):
+		}
+	}
+}
+
+// UploadResults returns the outcomes of uploads finished with FinishLater,
+// in the order of checks (at most wire.UploadResultsMax).
+func (c *Client) UploadResults(ctx context.Context, checks []wire.UploadCheck) ([]wire.UploadOutcome, error) {
+	var out wire.UploadResultsResponse
+	if err := c.Call(ctx, "POST", "/api/v1/uploads/results", wire.UploadResultsRequest{Uploads: checks}, &out); err != nil {
+		return nil, err
+	}
+	return out.Results, nil
 }

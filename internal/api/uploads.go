@@ -467,6 +467,9 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
+	bm := append([]byte(nil), cur.Received...)
+	bm[idx/8] |= 1 << (idx % 8)
+	chunkStored(cur, tmp, bm, already)
 	writeJSON(w, 200, map[string]any{"index": idx, "sha256": got})
 }
 
@@ -607,6 +610,9 @@ var (
 
 var errUploadDataLost = errors.New("upload data lost")
 
+// finalizeSlots bounds the finishes that run at the same time.
+var finalizeSlots = make(chan struct{}, 2)
+
 type finalizeJob struct {
 	done  chan struct{}
 	res   *store.CommitResult
@@ -681,10 +687,21 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request) {
 		unlock()
 	}
 	var wait <-chan time.Time
-	if strings.EqualFold(r.Header.Get("X-VD-Finalize"), "async") {
+	switch mode := r.Header.Get("X-VD-Finalize"); {
+	case strings.EqualFold(mode, "async"):
 		t := time.NewTimer(finalizeWait)
 		defer t.Stop()
 		wait = t.C
+	case strings.EqualFold(mode, "defer"):
+		// upload.deferred_finish: the client does not wait; it asks for the
+		// outcome later (POST /uploads/results).
+		t := time.NewTimer(0)
+		defer t.Stop()
+		select {
+		case <-job.done:
+		default:
+			wait = t.C
+		}
 	}
 	select {
 	case <-job.done:
@@ -746,6 +763,11 @@ func (s *Server) startFinalize(r *http.Request, p *Principal, up *store.Upload) 
 	logUploaded := s.activityLater(r, up.UserID, "file.uploaded")
 	ctx := context.WithoutCancel(r.Context())
 	go func() {
+		// A few finishes at a time: many at once only make a disk seek
+		// between them.
+		finalizeSlots <- struct{}{}
+		defer func() { <-finalizeSlots }()
+		defer dropStreamHash(up.ID)
 		beforeFinalize()
 		res, err := s.finalize(ctx, p, up)
 		if err != nil {
@@ -804,7 +826,7 @@ func (s *Server) finalize(ctx context.Context, p *Principal, up *store.Upload) (
 	if info.Size() != up.Size {
 		return nil, errf(422, "size_mismatch", "Assembled file is %d bytes, expected %d", info.Size(), up.Size)
 	}
-	sum, err := storage.HashFile(tmp)
+	sum, err := fileSHA256(up, tmp)
 	if err != nil {
 		return nil, err
 	}
@@ -889,6 +911,7 @@ func (s *Server) cancelUpload(ctx context.Context, up *store.Upload, reason stri
 	if err != nil || !deleted {
 		return false
 	}
+	dropStreamHash(up.ID)
 	if tmp, err := s.blobs.TempPath(up.LocationID, up.ID); err == nil {
 		storage.RemoveTemp(tmp)
 	}
@@ -944,6 +967,7 @@ func (s *Server) dropUpload(ctx context.Context, up *store.Upload) bool {
 	if deleted, err := s.st.DeleteUploadUnlessFinalizing(ctx, up.ID); err != nil || !deleted {
 		return false
 	}
+	dropStreamHash(up.ID)
 	if tmp, err := s.blobs.TempPath(up.LocationID, up.ID); err == nil {
 		storage.RemoveTemp(tmp)
 	}
