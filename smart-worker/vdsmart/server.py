@@ -210,12 +210,12 @@ def make_handler(app: App):
             if not app.authorised(self.headers.get("Authorization", "")):
                 self._drain()
                 return self._send(401, {"error": "unauthorised"})
-            n = int(self.headers.get("Content-Length") or 0)
             limit = config.MAX_FRAME_BYTES if u.path == "/v1/frames" else config.MAX_AUDIO_BYTES
-            if n < 0 or n > limit:
+            try:
+                body = self._body(limit)
+            except ValueError as e:
                 self.close_connection = True
-                return self._send(413, {"error": "request too large"})
-            body = self.rfile.read(n) if n else b""
+                return self._send(413 if "large" in str(e) else 400, {"error": str(e)})
             started = time.monotonic()
             try:
                 status, value = app.handle(method, u.path, parse_qs(u.query), body)
@@ -229,6 +229,30 @@ def make_handler(app: App):
             if u.path != "/v1/status":
                 log.info("%s %s %d %.1fs", method, u.path, status, time.monotonic() - started)
             self._send(status, value)
+
+        def _body(self, limit):
+            """The request body: sized by Content-Length or sent chunked."""
+            if "chunked" in self.headers.get("Transfer-Encoding", "").lower():
+                parts, total = [], 0
+                while True:
+                    line = self.rfile.readline(1024)
+                    try:
+                        size = int(line.split(b";")[0].strip(), 16)
+                    except ValueError:
+                        raise ValueError("invalid chunked body") from None
+                    if size == 0:
+                        while self.rfile.readline(1024).strip():  # trailers
+                            pass
+                        return b"".join(parts)
+                    total += size
+                    if total > limit:
+                        raise ValueError("request too large")
+                    parts.append(self.rfile.read(size))
+                    self.rfile.readline(8)  # CRLF after the chunk
+            n = int(self.headers.get("Content-Length") or 0)
+            if n < 0 or n > limit:
+                raise ValueError("request too large")
+            return self.rfile.read(n) if n else b""
 
         def _drain(self):
             n = int(self.headers.get("Content-Length") or 0)

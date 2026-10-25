@@ -221,3 +221,24 @@ def test_extract_json_and_tsv():
     assert w == [{"text": "SCORE", "box": [0.5, 0.5, 0.2, 0.2], "conf": 91.5}]
     p = softmax(np.array([[1.0, 1.0], [10.0, 0.0]]))
     assert np.allclose(p[0], [0.5, 0.5]) and p[1][0] > 0.99
+
+
+def test_chunked_upload_is_read(server):
+    import http.client
+    from urllib.parse import urlparse
+
+    base, eng, _ = server
+    u = urlparse(base)
+    wav = codec.wav_bytes(np.zeros(codec.SAMPLE_RATE, dtype=np.float32))
+    c = http.client.HTTPConnection(u.hostname, u.port, timeout=10)
+    c.putrequest("POST", "/v1/audio?tasks=vad")
+    c.putheader("Authorization", "Bearer secret")
+    c.putheader("Transfer-Encoding", "chunked")
+    c.endheaders()
+    for i in range(0, len(wav), 7000):
+        part = wav[i : i + 7000]
+        c.send(b"%x\r\n" % len(part) + part + b"\r\n")
+    c.send(b"0\r\n\r\n")
+    r = c.getresponse()
+    assert r.status == 200, r.read()
+    assert eng.calls[-1][1] == codec.SAMPLE_RATE

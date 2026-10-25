@@ -4,7 +4,7 @@ Smart processing analyses recordings stored in VaultDock (video chat, gaming, re
 
 ## Using it
 
-**Smart Processing** in the web app has these tabs: Overview, New Queue, Active Queues, Review, Cleanup, Completed Queues, Detection Presets and (administrators) Settings.
+**Smart Processing** in the web app has these tabs: Overview, New Queue, Active Queues, Review, Cleanup, Completed Queues, Detection Presets and Settings (your own defaults for new queues: presets, segment and clip settings). Server-wide settings and models are in **Administration → Smart processing** (administrators only).
 
 1. **Create a queue.** Choose folders (optionally with subfolders) or select files and folders in **Files → Smart processing → New queue**. Pick presets, add custom conditions (or describe what to find in words), tune the segment settings and where clips go.
 2. **Processing runs in the background.** It continues with the browser closed and resumes after a restart or upgrade. Analysis results are cached per file content, so changing a queue's detection re-evaluates recordings without measuring them again; a changed file is measured again.
@@ -13,7 +13,7 @@ Smart processing analyses recordings stored in VaultDock (video chat, gaming, re
 5. **Cleanup.** Originals become eligible once every approved segment has a verified clip. Originals reviewed with nothing kept are listed separately. Select per file, in bulk, for a folder (with subfolders) or a queue, see the recoverable space, and confirm a normal dialog showing the count and size: delete permanently or move to the trash (restorable for 7 days). Right before removal each original is checked again: unchanged, clips present with their recorded content and playable, and not itself a clip of another kept recording. Cleanup never runs automatically and only touches the chosen files of the signed-in user. The desktop app will not upload removed originals again.
 6. **Statistics.** Each queue keeps lifetime totals: clips made and their size, originals removed, storage actually freed (confirmed) and still recoverable (estimated), net savings, processing time, failures. Completed and archived queues stay available.
 
-Queue actions: pause, resume, cancel, retry failed, archive, reopen, duplicate, delete (records only; files stay).
+Queue actions: pause, resume, cancel, retry failed, restart from scratch (re-analyses every kept recording and clears suggestions and decisions; rendered clips and statistics stay), archive, reopen, duplicate, delete (records only; files stay).
 
 ## What it can detect
 
@@ -66,7 +66,7 @@ Enable the worker on the server:
 ./install.sh integrations smart on
 ```
 
-This generates `VAULTDOCK_SMART_TOKEN` in `.env`, creates `state/smart-models`, and adds `deploy/integrations/smart/compose.smart.yml` (image `ghcr.io/aspec-racing-pty-ltd/vad-smart-worker`, about 2.5 GB). Then install models under **Smart Processing → Settings** (or `docker exec vaultdock-smart-worker python -m vdsmart.install whisper ast …`). Nothing is downloaded before that; inference then runs offline. Disable with `./install.sh integrations smart off` (models stay on disk until you delete the folder).
+This generates `VAULTDOCK_SMART_TOKEN` in `.env`, creates `state/smart-models`, and adds `deploy/integrations/smart/compose.smart.yml` (image `ghcr.io/aspec-racing-pty-ltd/vad-smart-worker`, about 2.5 GB). Then install models under **Administration → Smart processing** (or `docker exec vaultdock-smart-worker python -m vdsmart.install whisper ast …`). Nothing is downloaded before that; inference then runs offline. Disable with `./install.sh integrations smart off` (models stay on disk until you delete the folder).
 
 | Model | Download | Memory when loaded |
 |---|---|---|
@@ -80,7 +80,7 @@ This generates `VAULTDOCK_SMART_TOKEN` in `.env`, creates `state/smart-models`, 
 | yunet, silero-vad, tesseract | < 3 MB each | small |
 | planner (optional) | 3.1 GB | ~6 GB |
 
-Models are unloaded after 10 idle minutes (`SMART_IDLE_UNLOAD`). Worker limits: `VAULTDOCK_SMART_CPUS` (default 2) and `VAULTDOCK_SMART_MEMORY` (default 6g). Server-side intensity (Settings): recordings analysed and rendered at once, FFmpeg threads, low priority, hardware decoding, frames per second, frame width, OCR interval, audio chunk length, longest recording, speech language, and on/off. A larger Whisper model can be used with `SMART_WHISPER_REPO` (for example `Systran/faster-whisper-medium`, also MIT).
+Models are unloaded after 10 idle minutes (`SMART_IDLE_UNLOAD`). Worker limits: `VAULTDOCK_SMART_CPUS` (default 2) and `VAULTDOCK_SMART_MEMORY` (default 6g). Server-side intensity (Administration → Smart processing): recordings analysed and rendered at once, FFmpeg threads, low priority, hardware decoding, frames per second, frame width, OCR interval, audio chunk length, longest recording, speech language, and on/off. A larger Whisper model can be used with `SMART_WHISPER_REPO` (for example `Systran/faster-whisper-medium`, also MIT).
 
 **GPU (optional, NVIDIA):** build the worker with `--build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu124` and add a GPU reservation in `docker-compose.override.yml` (`deploy.resources.reservations.devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]`). The worker uses CUDA automatically. FFmpeg decoding on the server can use the hardware decoder setting independently.
 

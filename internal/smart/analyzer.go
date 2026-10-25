@@ -371,7 +371,7 @@ func (a *Analyzer) audio(ctx context.Context, src Source, s Settings, w *Worker,
 		off := int64(from*SampleRate) * 2
 		n := int64((to-from)*SampleRate) * 2
 		body := io.MultiReader(strings.NewReader(string(WAVHeader(int(n)))), io.NewSectionReader(pcm, off, n))
-		res, err := w.Audio(ctx, body, wt, s.Language)
+		res, err := w.Audio(ctx, body, 44+n, wt, s.Language)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()

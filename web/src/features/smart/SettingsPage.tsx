@@ -54,7 +54,7 @@ export default function SettingsPage() {
   const res = status.data?.resources ?? {}
   return (
     <div className="space-y-5">
-      <PageHeader title="Smart processing settings" icon={<Settings className="size-5" />} description="Applies to every user. Everything runs on this server and the local inference worker; nothing is sent elsewhere." />
+      <PageHeader title="Smart processing" icon={<Settings className="size-5" />} description="Server-wide settings for every user: processing intensity, the inference worker and its models. Everything runs on this server; nothing is sent elsewhere." />
 
       <div className="card space-y-4 p-5">
         <h2 className="font-semibold">Processing</h2>
@@ -67,7 +67,7 @@ export default function SettingsPage() {
           {num('frame_rate', 'Frames per second analysed', 'Higher finds short visual events, costs more', 0.1, 5, 0.1)}
           {num('frame_width', 'Frame width (pixels)', 'Larger reads smaller on-screen text', 224, 1920, 16)}
           {num('ocr_every', 'Seconds between OCR reads', 'Lower catches brief text', 0.5, 60, 0.5)}
-          {num('chunk_seconds', 'Audio chunk (seconds)', 'Checkpoint interval for long recordings', 60, 3600, 60)}
+          {num('chunk_seconds', 'Audio chunk (seconds)', 'Checkpoint interval for long recordings', 60, 1800, 60)}
           <Field label="Hardware decoding" hint="GPU decoding when available; falls back to the CPU">
             <select className="input" value={v.hwaccel} onChange={(e) => set('hwaccel', e.target.value)}>
               <option value="">Off (CPU)</option>

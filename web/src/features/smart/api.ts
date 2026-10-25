@@ -260,6 +260,8 @@ export type QueueStats = Counters & {
 
 export type FileSmartState = { node_id: number; state: 'queued' | 'analysing' | 'review' | 'rendering' | 'processed' | 'failed' | ''; cleanup?: 'eligible' | 'no_segments'; clips: number; queues: number[]; output?: boolean }
 
+export type Prefs = { context: SegmentContext; output: OutputSettings; auto_approve: boolean; preset_ids: string[] }
+
 export type Sources = { file_ids?: number[]; folder_ids?: number[]; recursive?: boolean }
 
 // --- calls ---
@@ -278,7 +280,7 @@ export const smartApi = {
   createQueue: (q: { name: string; description?: string; preset_ids: string[]; filter?: Filter; context?: SegmentContext; output?: OutputSettings; auto_approve?: boolean; paused?: boolean } & Sources) => post<Queue>('/smart/queues', q),
   updateQueue: (id: number, q: Partial<{ name: string; description: string; output: OutputSettings; auto_approve: boolean }>) => patch<Queue>(`/smart/queues/${id}`, q),
   setQueueFilter: (id: number, f: { preset_ids: string[]; filter?: Filter; context?: SegmentContext }) => put<Queue>(`/smart/queues/${id}/filter`, f),
-  queueAction: (id: number, action: 'pause' | 'resume' | 'cancel' | 'retry' | 'archive' | 'reopen' | 'duplicate') => post<Queue>(`/smart/queues/${id}/actions/${action}`),
+  queueAction: (id: number, action: 'pause' | 'resume' | 'cancel' | 'retry' | 'archive' | 'reopen' | 'duplicate' | 'restart') => post<Queue>(`/smart/queues/${id}/actions/${action}`),
   deleteQueue: (id: number) => del(`/smart/queues/${id}`),
   items: (id: number, state?: string) => get<{ items: Item[]; total: number }>(withQuery(`/smart/queues/${id}/items`, { state })),
   addItems: (id: number, s: Sources) => post<{ added: number; skipped: number; found: number }>(`/smart/queues/${id}/items`, s),
@@ -306,6 +308,9 @@ export const smartApi = {
   runCleanup: (itemIds: number[], mode: 'delete' | 'trash', includeNoSegments: boolean) =>
     post<{ results: CleanupResult[]; removed: number; bytes: number; freed: number }>('/smart/cleanup', { item_ids: itemIds, mode, include_no_segments: includeNoSegments }),
   stats: (queueId?: number) => get<{ queues: QueueStats[]; total: QueueStats }>(withQuery('/smart/stats', { queue_id: queueId })),
+
+  prefs: () => get<Prefs>('/smart/preferences'),
+  savePrefs: (p: Prefs) => put<Prefs>('/smart/preferences', p),
 
   adminSettings: () => get<{ settings: SmartSettings; env_worker_url: string; token_set: boolean }>('/admin/smart/settings'),
   saveAdminSettings: (s: SmartSettings) => put<{ settings: SmartSettings }>('/admin/smart/settings', s),

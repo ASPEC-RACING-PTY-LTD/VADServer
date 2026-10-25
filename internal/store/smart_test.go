@@ -235,3 +235,32 @@ func TestSmartRecordsAreScopedToTheirUser(t *testing.T) {
 		t.Fatalf("queues: %+v", qs)
 	}
 }
+
+func TestSmartQueueRestartStartsOver(t *testing.T) {
+	st, u, q, _ := smartFixture(t)
+	ctx := context.Background()
+	it, _ := st.ClaimSmartItem(ctx)
+	_ = st.FinishSmartAnalysis(ctx, it, store.SmartAnalysed{State: "ready", SHA256: it.SHA256, Duration: 30, Detectors: "[]", Warnings: "[]",
+		Segments: []store.SmartSegment{{Start: 1, End: 5, Score: 0.9, Reasons: "[]"}}, Approve: true})
+	_ = st.SetSmartQueueState(ctx, u.ID, q.ID, "archived")
+	shas, err := st.RestartSmartQueue(ctx, u.ID, q.ID)
+	if err != nil || len(shas) != 3 {
+		t.Fatalf("restart: %v %v", shas, err)
+	}
+	items, _, _ := st.SmartItems(ctx, u.ID, q.ID, store.SmartItemsQuery{})
+	for _, i := range items {
+		if i.State != "pending" || i.AnalysedAt != nil || i.ReviewedAt != nil {
+			t.Fatalf("item not reset: %+v", i)
+		}
+	}
+	if segs, _ := st.SmartSegments(ctx, it.ID); len(segs) != 0 {
+		t.Fatalf("segments kept: %+v", segs)
+	}
+	if qq, _ := st.SmartQueue(ctx, u.ID, q.ID); qq.State != "active" || qq.ArchivedAt != nil {
+		t.Fatalf("queue: %+v", qq)
+	}
+	other, _ := st.CreateUser(ctx, store.NewUser{Username: "o2", PasswordHash: "x", Role: "user"})
+	if _, err := st.RestartSmartQueue(ctx, other.ID, q.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("other user restarted: %v", err)
+	}
+}

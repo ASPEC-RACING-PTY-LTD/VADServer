@@ -260,6 +260,50 @@ func (s *Store) DeleteSmartQueue(ctx context.Context, userID, id int64) error {
 	})
 }
 
+// RestartSmartQueue starts a queue over: every recording still kept goes
+// back to analysis, suggestions and review decisions are removed, and clips
+// not rendered yet are dropped. Rendered clips (files and their links) and
+// lifetime totals stay. It returns the content hashes of the recordings, so
+// their cached measurements can be discarded.
+func (s *Store) RestartSmartQueue(ctx context.Context, userID, id int64) ([]string, error) {
+	var shas []string
+	err := s.Tx(ctx, func(tx *sql.Tx) error {
+		t := now()
+		res, err := tx.ExecContext(ctx, "UPDATE smart_queues SET state = 'active', completed_at = NULL, archived_at = NULL, filter_rev = filter_rev + 1, updated_at = ? WHERE id = ? AND user_id = ?", t, id, userID)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		for _, q := range []string{
+			"DELETE FROM smart_segments WHERE queue_id = ?",
+			"DELETE FROM smart_outputs WHERE queue_id = ? AND state != 'done'",
+		} {
+			if _, err := tx.ExecContext(ctx, q, id); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE smart_items SET state = 'pending', stage = '', progress = 0, error = '', warnings = '[]', detectors = '[]', events = 0,
+			analysed_at = NULL, reviewed_at = NULL, updated_at = ? WHERE queue_id = ? AND original_state = 'kept' AND state != 'gone'`, t, id); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, "SELECT DISTINCT sha256 FROM smart_items WHERE queue_id = ? AND state = 'pending'", id)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var h string
+			if rows.Scan(&h) == nil && h != "" {
+				shas = append(shas, h)
+			}
+		}
+		return rows.Err()
+	})
+	return shas, err
+}
+
 // AddSmartCounters adds to a queue's lifetime totals.
 func (s *Store) AddSmartCounters(ctx context.Context, queueID int64, c SmartCounters) error {
 	_, err := s.DB.ExecContext(ctx, `UPDATE smart_queues SET generated_count = generated_count + ?, generated_bytes = generated_bytes + ?,

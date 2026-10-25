@@ -30,7 +30,7 @@ export function CapabilityReport({ components, unsupported, notes, compact }: { 
             {!compact && <div className="text-xs text-slate-500 dark:text-slate-400">{c.reliability}</div>}
             <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               Uses {c.detectors.join(', ') || 'no detector'}
-              {!c.available && c.missing?.length ? <span className="text-amber-700 dark:text-amber-300"> · needs {c.missing.join(', ')} (install in Smart Processing settings)</span> : null}
+              {!c.available && c.missing?.length ? <span className="text-amber-700 dark:text-amber-300"> · needs {c.missing.join(', ')} (an administrator installs models under Administration &gt; Smart processing)</span> : null}
             </div>
           </div>
         </div>

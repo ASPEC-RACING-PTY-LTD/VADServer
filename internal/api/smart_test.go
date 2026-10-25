@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -26,6 +27,12 @@ func fakeWorker(t *testing.T) *httptest.Server {
 				"silero-vad": map[string]any{"installed": true}, "whisper": map[string]any{"installed": true}, "ast": map[string]any{"installed": false},
 			}})
 		case "/v1/audio":
+			// Like the real worker: the body must be sized and a valid WAV.
+			b, _ := io.ReadAll(r.Body)
+			if r.ContentLength <= 44 || int64(len(b)) != r.ContentLength || string(b[:4]) != "RIFF" || string(b[36:40]) != "data" {
+				http.Error(w, `{"error":"invalid WAV"}`, 400)
+				return
+			}
 			if !strings.Contains(r.URL.Query().Get("tasks"), "transcript") {
 				http.Error(w, `{"error":"unexpected tasks"}`, 400)
 				return
@@ -147,6 +154,23 @@ func TestSmartProcessingEndToEnd(t *testing.T) {
 
 	// Another user sees none of it.
 	other := e.createUser(admin, "bob", 0)
+	// Server settings and models are for administrators; everyone has their own defaults.
+	if code, _ := other.req("GET", "/api/v1/admin/smart/settings", nil); code != 403 {
+		t.Fatalf("user reads admin settings: %d", code)
+	}
+	if code, _ := other.req("POST", "/api/v1/admin/smart/models", map[string]any{"install": []string{"ast"}}); code != 403 {
+		t.Fatalf("user installs models: %d", code)
+	}
+	prefs := other.must("GET", "/api/v1/smart/preferences", nil, 200)
+	prefs["auto_approve"] = true
+	prefs["preset_ids"] = []string{"builtin:laughter"}
+	other.must("PUT", "/api/v1/smart/preferences", prefs, 200)
+	if got := other.must("GET", "/api/v1/smart/preferences", nil, 200); got["auto_approve"] != true {
+		t.Fatalf("preferences: %v", got)
+	}
+	if got := admin.must("GET", "/api/v1/smart/preferences", nil, 200); got["auto_approve"] != false {
+		t.Fatalf("preferences leaked between users: %v", got)
+	}
 	if code, _ := other.req("GET", fmt.Sprintf("/api/v1/smart/queues/%d", qid), nil); code != 404 {
 		t.Fatalf("other user reads the queue: %d", code)
 	}
@@ -230,7 +254,7 @@ func TestSmartProcessingEndToEnd(t *testing.T) {
 		t.Fatalf("duplicate: %v", dup)
 	}
 	did := int64(dup["id"].(float64))
-	for _, a := range []string{"resume", "pause", "cancel", "reopen", "pause"} {
+	for _, a := range []string{"resume", "pause", "cancel", "reopen", "pause", "restart"} {
 		admin.must("POST", fmt.Sprintf("/api/v1/smart/queues/%d/actions/%s", did, a), nil, 200)
 	}
 	admin.must("DELETE", fmt.Sprintf("/api/v1/smart/queues/%d", did), nil, 204)

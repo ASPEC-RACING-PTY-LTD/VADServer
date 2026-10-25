@@ -39,6 +39,18 @@ export default function NewQueuePage() {
   const [autoApprove, setAutoApprove] = useState(false)
   const [busy, setBusy] = useState(false)
   const check = useFilterCheck()
+  // Start from the user's saved defaults (Smart Processing > Settings).
+  const prefs = useQuery({ queryKey: smartKeys.sub('prefs'), queryFn: smartApi.prefs })
+  const [prefsApplied, setPrefsApplied] = useState(false)
+  useEffect(() => {
+    if (!prefs.data || prefsApplied) return
+    setPrefsApplied(true)
+    setOutput(prefs.data.output)
+    setAutoApprove(prefs.data.auto_approve)
+    if (prefs.data.preset_ids.length) setChosen(prefs.data.preset_ids)
+    setCtx(prefs.data.context)
+    setCtxTouched(true)
+  }, [prefs.data, prefsApplied])
 
   // Files and folders handed over from the file browser.
   const initFiles = params.get('files')

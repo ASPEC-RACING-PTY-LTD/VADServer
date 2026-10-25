@@ -83,12 +83,21 @@ func (s *WorkerStatus) Installed() map[string]bool {
 }
 
 func (w *Worker) do(ctx context.Context, method, path string, body io.Reader, ctype string, out any) error {
+	return w.doSized(ctx, method, path, body, -1, ctype, out)
+}
+
+// doSized sends a body of a known size (size >= 0) with its length, so the
+// worker never receives a streamed (chunked) body it cannot size.
+func (w *Worker) doSized(ctx context.Context, method, path string, body io.Reader, size int64, ctype string, out any) error {
 	if w == nil {
 		return ErrNoWorker
 	}
 	req, err := http.NewRequestWithContext(ctx, method, w.URL+path, body)
 	if err != nil {
 		return err
+	}
+	if size >= 0 {
+		req.ContentLength = size
 	}
 	if w.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+w.Token)
@@ -189,14 +198,14 @@ func (v *wireVecs) decode() (*Vecs, error) {
 	return &x, nil
 }
 
-// Audio analyses a WAV chunk (16 kHz mono).
-func (w *Worker) Audio(ctx context.Context, wav io.Reader, tasks []string, language string) (*AudioResult, error) {
+// Audio analyses a WAV chunk (16 kHz mono) of size bytes.
+func (w *Worker) Audio(ctx context.Context, wav io.Reader, size int64, tasks []string, language string) (*AudioResult, error) {
 	q := url.Values{"tasks": {strings.Join(tasks, ",")}}
 	if language != "" {
 		q.Set("language", language)
 	}
 	var out AudioResult
-	if err := w.do(ctx, "POST", "/v1/audio?"+q.Encode(), wav, "audio/wav", &out); err != nil {
+	if err := w.doSized(ctx, "POST", "/v1/audio?"+q.Encode(), wav, size, "audio/wav", &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

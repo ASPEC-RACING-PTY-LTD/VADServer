@@ -1336,7 +1336,7 @@ do_smart() {
 		chmod 750 -- "$dir"
 		integration_enabled smart || { cur=$(env_get VAULTDOCK_INTEGRATIONS); env_set_managed VAULTDOCK_INTEGRATIONS "${cur:+$cur,}smart"; }
 		compose up -d || die "The containers could not be started; see the messages above."
-		ok "Smart processing worker started. Install its models in the admin console (Admin > Smart processing)."
+		ok "Smart processing worker started. Install its models in Administration > Smart processing."
 		;;
 	off)
 		integration_enabled smart || { ok "The smart processing worker is not enabled."; return 0; }

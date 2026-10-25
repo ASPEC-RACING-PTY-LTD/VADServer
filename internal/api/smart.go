@@ -65,6 +65,9 @@ func (s *Server) mountSmart(rt routes) {
 	rt.Sess.Post("/smart/segments/merge", s.handleSmartSegmentMerge)
 	rt.Sess.Post("/smart/segments/bulk", s.handleSmartSegmentBulk)
 
+	rt.Sess.Get("/smart/preferences", s.handleSmartPrefs)
+	rt.Sess.Put("/smart/preferences", s.handleSmartPrefsSave)
+
 	rt.Sess.Get("/smart/search", s.handleSmartSearch)
 	rt.Sess.Post("/smart/files", s.handleSmartFiles)
 	rt.Sess.Get("/smart/files/folder", s.handleSmartFolderFiles)
@@ -773,6 +776,18 @@ func (s *Server) handleSmartQueueAction(w http.ResponseWriter, r *http.Request) 
 	case "duplicate":
 		s.duplicateQueue(w, r, q)
 		return
+	case "restart":
+		stop()
+		shas, err := s.st.RestartSmartQueue(context.WithoutCancel(ctx), q.UserID, q.ID)
+		if err != nil {
+			writeErr(w, r, err)
+			return
+		}
+		// From scratch: measurements are taken again, not reused.
+		an := s.smartAnalyzer()
+		for _, h := range shas {
+			_ = an.Forget(q.UserID, h)
+		}
 	default:
 		writeErr(w, r, errf(404, "unknown_action", "Unknown queue action"))
 		return
@@ -1623,6 +1638,77 @@ func (s *Server) handleSmartSegmentBulk(w http.ResponseWriter, r *http.Request) 
 		s.smartRun().poke()
 	}
 	writeJSON(w, 200, map[string]any{"updated": n, "reviewed": reviewed})
+}
+
+// --- per-user preferences ---
+
+// smartPrefs are a user's defaults for new queues.
+type smartPrefs struct {
+	Context     smart.Context       `json:"context"`
+	Output      smartOutputSettings `json:"output"`
+	AutoApprove bool                `json:"auto_approve"`
+	Presets     []string            `json:"preset_ids"`
+}
+
+func smartPrefsKey(userID int64) string { return fmt.Sprintf("smart.prefs.%d", userID) }
+
+func (s *Server) smartPrefs(ctx context.Context, userID int64) smartPrefs {
+	p := smartPrefs{Context: smart.DefaultContext(), Output: defaultOutput(), Presets: []string{}}
+	if raw, ok, err := s.st.GetSetting(ctx, smartPrefsKey(userID)); err == nil && ok {
+		_ = json.Unmarshal([]byte(raw), &p)
+	}
+	if p.Presets == nil {
+		p.Presets = []string{}
+	}
+	return p
+}
+
+func (s *Server) handleSmartPrefs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, s.smartPrefs(r.Context(), principal(r).User.ID))
+}
+
+func (s *Server) handleSmartPrefsSave(w http.ResponseWriter, r *http.Request) {
+	u := principal(r).User
+	var p smartPrefs
+	if err := decode(r, &p); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	f := smart.Filter{Context: p.Context}
+	if err := f.Validate(); err != nil {
+		writeErr(w, r, errf(400, "invalid_settings", "%s", err.Error()))
+		return
+	}
+	p.Context = f.Context
+	if err := p.Output.validate(); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	if p.Output.Destination == "folder" {
+		if n, err := s.st.Node(r.Context(), u.ID, p.Output.FolderID); err != nil || !n.IsDir {
+			writeErr(w, r, errf(404, "folder_missing", "The destination folder does not exist"))
+			return
+		}
+	}
+	if len(p.Presets) > 12 {
+		writeErr(w, r, errf(400, "too_many_presets", "Use at most 12 presets"))
+		return
+	}
+	for _, id := range p.Presets {
+		if _, err := s.smartPreset(r.Context(), u.ID, id); err != nil {
+			writeErr(w, r, err)
+			return
+		}
+	}
+	if p.Presets == nil {
+		p.Presets = []string{}
+	}
+	b, _ := json.Marshal(p)
+	if err := s.st.SetSetting(r.Context(), smartPrefsKey(u.ID), string(b)); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	writeJSON(w, 200, p)
 }
 
 // --- transcript search and the file browser ---

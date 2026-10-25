@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { cx, PageLoader } from '../../components/ui'
-import { useAuth } from '../../lib/auth'
 
 const OverviewPage = lazy(() => import('./OverviewPage'))
 const NewQueuePage = lazy(() => import('./NewQueuePage'))
@@ -10,7 +9,7 @@ const QueuePage = lazy(() => import('./QueuePage'))
 const ReviewPage = lazy(() => import('./ReviewPage'))
 const CleanupPage = lazy(() => import('./CleanupPage'))
 const PresetsPage = lazy(() => import('./PresetsPage'))
-const SettingsPage = lazy(() => import('./SettingsPage'))
+const PreferencesPage = lazy(() => import('./PreferencesPage'))
 
 const tabs = [
   { to: '/smart', label: 'Overview', end: true },
@@ -20,17 +19,15 @@ const tabs = [
   { to: '/smart/cleanup', label: 'Cleanup' },
   { to: '/smart/completed', label: 'Completed Queues' },
   { to: '/smart/presets', label: 'Detection Presets' },
+  { to: '/smart/settings', label: 'Settings' },
 ]
 
 /** The Smart Processing section: its tabs and pages. */
 export default function SmartSection() {
-  const { state } = useAuth()
-  const isAdmin = state.status === 'authenticated' && state.user.role === 'admin'
-  const all = isAdmin ? [...tabs, { to: '/smart/settings', label: 'Settings' }] : tabs
   return (
     <div>
       <nav aria-label="Smart processing" className="mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
-        {all.map((t) => (
+        {tabs.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
@@ -57,7 +54,7 @@ export default function SmartSection() {
           <Route path="review/:itemId" element={<ReviewPage />} />
           <Route path="cleanup" element={<CleanupPage />} />
           <Route path="presets" element={<PresetsPage />} />
-          <Route path="settings" element={isAdmin ? <SettingsPage /> : <Navigate to="/smart" replace />} />
+          <Route path="settings" element={<PreferencesPage />} />
           <Route path="*" element={<Navigate to="/smart" replace />} />
         </Routes>
       </Suspense>

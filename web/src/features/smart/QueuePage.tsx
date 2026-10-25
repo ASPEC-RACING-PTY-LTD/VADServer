@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Archive, Clapperboard, Copy, Eye, FolderPlus, HardDrive, ListVideo, Pause, Play, RotateCcw, Trash2, Undo2, XCircle } from 'lucide-react'
+import { AlertTriangle, Archive, Clapperboard, Copy, Eye, FolderPlus, HardDrive, ListVideo, Pause, Play, RefreshCw, RotateCcw, Trash2, Undo2, XCircle } from 'lucide-react'
 import { Badge, Button, EmptyState, ErrorState, Field, Modal, PageHeader, PageLoader, ProgressBar, Stat, Tabs, Toggle, useUI } from '../../components/ui'
 import { MoveModal } from '../../components/files/MoveModal'
 import { errorMessage } from '../../lib/api'
@@ -42,6 +42,14 @@ export default function QueuePage() {
     } finally {
       setBusy('')
     }
+  }
+  const restart = async () => {
+    const ok = await confirm({
+      title: 'Restart this queue from scratch?',
+      message: 'Every recording still kept is analysed again from the beginning. Suggestions and review decisions are cleared. Clips already rendered stay in your files, and the queue statistics are kept.',
+      confirmLabel: 'Restart queue',
+    })
+    if (ok) act('restart')
   }
   const remove = async () => {
     const ok = await confirm({ title: 'Delete this queue?', message: 'Its records, decisions and statistics are removed. Files (originals and clips) are not touched.', confirmLabel: 'Delete queue' })
@@ -94,6 +102,9 @@ export default function QueuePage() {
                 Archive
               </Button>
             )}
+            <Button icon={<RefreshCw className="size-4" />} loading={busy === 'restart'} onClick={restart}>
+              Restart
+            </Button>
             <Button icon={<Copy className="size-4" />} loading={busy === 'duplicate'} onClick={() => act('duplicate')}>
               Duplicate
             </Button>

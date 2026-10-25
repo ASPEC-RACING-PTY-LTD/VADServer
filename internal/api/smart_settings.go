@@ -65,8 +65,8 @@ func (c *smartSettings) validate() error {
 		return errors.New("frame width must be 224-1920 pixels")
 	case c.OCREvery < 0.5 || c.OCREvery > 60:
 		return errors.New("on-screen text must be read every 0.5-60 seconds")
-	case c.ChunkSeconds < 60 || c.ChunkSeconds > 3600:
-		return errors.New("audio chunks must be 60-3600 seconds")
+	case c.ChunkSeconds < 60 || c.ChunkSeconds > 1800:
+		return errors.New("audio chunks must be 60-1800 seconds")
 	case c.MaxMinutes < 0 || c.MaxMinutes > 24*60:
 		return errors.New("the longest recording must be 0-1440 minutes")
 	case len(c.Language) > 8:

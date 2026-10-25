@@ -314,7 +314,7 @@ func (p *Plan) finish(avail Availability) {
 		p.Status = "supported"
 	}
 	if bad > 0 {
-		p.Notes = append(p.Notes, "Some conditions need models that are not installed; they find nothing until the models are installed under Smart Processing → Settings.")
+		p.Notes = append(p.Notes, "Some conditions need models that are not installed; they find nothing until an administrator installs them under Administration → Smart processing.")
 	}
 }
 
