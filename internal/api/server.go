@@ -58,6 +58,7 @@ type Server struct {
 	ops     *opRunner     // long operations (operations.go)
 	media   *mediaService // video thumbnails and frames (media.go)
 	exports *exportRunner // video clip exports (video_editor.go)
+	smart   *smartRunner  // smart video processing (smart_*.go)
 }
 
 func New(cfg *config.Config, st *store.Store, blobs *storage.Manager, settings *SettingsCache, geo *Geo) *Server {
@@ -67,6 +68,7 @@ func New(cfg *config.Config, st *store.Store, blobs *storage.Manager, settings *
 		ops:           newOpRunner(),
 		media:         newMediaService(cfg.StateDir),
 		exports:       newExportRunner(),
+		smart:         newSmartRunner(),
 		loginLimiter:  auth.NewLimiter(20, 10),
 		enrollLimiter: auth.NewLimiter(10, 5),
 		apiLimiter:    auth.NewLimiter(6000, 1200),
@@ -784,6 +786,7 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountNotifyPrefs(rt)
 	s.mountAI(rt)
 	s.mountVideoEditor(rt)
+	s.mountSmart(rt)
 }
 
 // Handler builds the HTTP router.

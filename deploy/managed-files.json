@@ -10,6 +10,7 @@
     { "path": "deploy/integrations/caddy/Caddyfile", "policy": "keep-modified", "legacy_path": "deploy/Caddyfile", "known_sha256": "816bd1bf84fef1471026f0138e5458be7ef4cc965f186e02c208f198febad10e", "description": "Caddy configuration for the caddy integration." },
     { "path": "deploy/integrations/cloudflared/detect.sh", "policy": "replace", "description": "Read-only detection of an existing cloudflared (systemd, snap, Docker, process), used by install.sh integrations." },
     { "path": "deploy/integrations/cloudflared/compose.cloudflared-net.yml", "policy": "keep-modified", "description": "Opt-in: join VaultDock to the Docker network of an existing cloudflared (VAULTDOCK_INTEGRATIONS=cloudflared-net, VAULTDOCK_TUNNEL_NETWORK)." },
+    { "path": "deploy/integrations/smart/compose.smart.yml", "policy": "keep-modified", "description": "Opt-in smart processing inference worker (VAULTDOCK_INTEGRATIONS=smart; install.sh integrations smart on). Local AI models, no published ports." },
     { "path": ".env", "policy": "merge", "description": "Configuration. Existing values are never changed; missing variables are appended; obsolete ones are removed only with per-variable approval." },
     { "path": "docker-compose.override.yml", "policy": "user", "description": "Your own compose changes (extra disks, labels)." },
     { "path": "deploy/env-approvals", "policy": "user", "description": "Optional: obsolete variable names approved for removal from .env, one per line." }

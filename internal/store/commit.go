@@ -34,6 +34,11 @@ type CommitRequest struct {
 	BaseSHA256    string
 	PrevSegs      []string
 	FileCreatedAt int64
+
+	// AfterTx, when set, runs inside the commit's transaction once the file
+	// node exists (not for skipped files), so a caller can link it to its own
+	// records atomically (smart processing outputs).
+	AfterTx func(tx *sql.Tx, nodeID int64) error
 }
 
 // CommitResult reports what happened.
@@ -96,6 +101,11 @@ func (s *Store) CommitFile(ctx context.Context, r CommitRequest) (*CommitResult,
 				return err
 			}
 			nodeID = existing.ID
+			if r.AfterTx != nil {
+				if err := r.AfterTx(tx, nodeID); err != nil {
+					return err
+				}
+			}
 			return finishUpload(ctx, tx, r, "unchanged")
 		case moved || (r.BaseSHA256 != "" && existing.SHA256 == r.BaseSHA256):
 			update = true // the device's own earlier version
@@ -170,6 +180,11 @@ func (s *Store) CommitFile(ctx context.Context, r CommitRequest) (*CommitResult,
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE nodes SET updated_at = ? WHERE id = ?", t, parent); err != nil {
 			return err
+		}
+		if r.AfterTx != nil {
+			if err := r.AfterTx(tx, nodeID); err != nil {
+				return err
+			}
 		}
 		return finishUpload(ctx, tx, r, "completed")
 	})

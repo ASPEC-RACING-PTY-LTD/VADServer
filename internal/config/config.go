@@ -16,6 +16,10 @@ type Config struct {
 	Listen string
 	// StateDir holds the database, generated secrets and TLS material.
 	StateDir string
+	// SmartWorkerURL and SmartToken reach the optional smart processing
+	// worker (local inference container); empty URL: not installed.
+	SmartWorkerURL string
+	SmartToken     string
 	// DefaultStorage is the storage location created on first start.
 	DefaultStorage string
 	// StorageRoots restricts which directories admins may register as
@@ -122,6 +126,9 @@ func Load() (*Config, error) {
 		NodeBinaries:   env("VAULTDOCK_NODE_BINARIES", "/usr/local/share/vaultdock/nodes"),
 
 		AIAllowPrivateEndpoints: envBool("VAULTDOCK_AI_ALLOW_PRIVATE_ENDPOINTS", false),
+
+		SmartWorkerURL: env("VAULTDOCK_SMART_WORKER_URL", ""),
+		SmartToken:     env("VAULTDOCK_SMART_TOKEN", ""),
 	}
 	c.KEKFile = env("VAULTDOCK_KEK_FILE", filepath.Join(c.StateDir, "keys", "kek"))
 	for _, r := range strings.Split(env("VAULTDOCK_STORAGE_ROOTS", "/storage"), ",") {

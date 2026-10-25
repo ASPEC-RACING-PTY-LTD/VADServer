@@ -1,0 +1,48 @@
+# Opt-in integration: smart processing inference worker (local AI models
+# for smart video processing: speech to text, sound events, described
+# scenes, faces, on-screen text).
+#
+# Enable with install.sh (VAULTDOCK_INTEGRATIONS=smart in .env). install.sh
+# then adds this file:
+#   docker compose -f docker-compose.yml \
+#     -f deploy/integrations/smart/compose.smart.yml up -d
+#
+# The worker has no published ports: only VaultDock reaches it, on the
+# compose network, with the shared VAULTDOCK_SMART_TOKEN. It downloads
+# nothing until an administrator installs models (Admin > Smart processing);
+# models are kept in ${VAULTDOCK_STATE_PATH}/smart-models. Without this
+# integration, smart processing still works with the server's own FFmpeg
+# measurements (loudness, motion, scene changes).
+#
+# Limits: VAULTDOCK_SMART_CPUS (default 2) and VAULTDOCK_SMART_MEMORY
+# (default 6g). See docs/smart-processing.md for GPU use.
+
+services:
+  vaultdock:
+    environment:
+      VAULTDOCK_SMART_WORKER_URL: http://smart-worker:8790
+
+  smart-worker:
+    image: ${VAULTDOCK_SMART_IMAGE:-ghcr.io/aspec-racing-pty-ltd/vad-smart-worker:latest}
+    container_name: vaultdock-smart-worker
+    restart: unless-stopped
+    user: "${VAULTDOCK_UID:-65532}:${VAULTDOCK_GID:-65532}"
+    environment:
+      VAULTDOCK_SMART_TOKEN: ${VAULTDOCK_SMART_TOKEN:?set VAULTDOCK_SMART_TOKEN in .env}
+      SMART_THREADS: ${VAULTDOCK_SMART_CPUS:-2}
+      XDG_CACHE_HOME: /tmp/cache
+      TORCH_HOME: /models/.torch
+    volumes:
+      - "${VAULTDOCK_STATE_PATH:-./data/state}/smart-models:/models"
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cpus: ${VAULTDOCK_SMART_CPUS:-2}
+    mem_limit: ${VAULTDOCK_SMART_MEMORY:-6g}
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

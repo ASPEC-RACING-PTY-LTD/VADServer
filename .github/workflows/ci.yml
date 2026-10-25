@@ -130,6 +130,32 @@ jobs:
             echo "scripts/test-install/run.sh not present; skipping the dry run."
           fi
 
+  smart-worker:
+    name: Smart worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: smart-worker
+          load: true
+          tags: vad-smart-worker:ci
+          cache-from: type=gha,scope=smart-worker-ci
+          cache-to: type=gha,scope=smart-worker-ci,mode=max
+      # Unit tests (no models are downloaded in CI).
+      - name: Tests
+        run: |
+          docker run --rm --user 0 -v "$PWD/smart-worker/tests:/app/tests:ro" -e SMART_MODELS_DIR=/tmp/models vad-smart-worker:ci             sh -c 'pip install -q pytest==8.3.3 && cd /app && python -m pytest -q -p no:cacheprovider tests'
+      - name: Starts without a token only when allowed
+        run: |
+          if docker run --rm vad-smart-worker:ci; then echo "started without a token"; exit 1; fi
+          docker run -d --name sw -e VAULTDOCK_SMART_TOKEN=ci-token vad-smart-worker:ci
+          for _ in $(seq 1 30); do [ "$(docker inspect -f '{{.State.Health.Status}}' sw)" = healthy ] && break; sleep 2; done
+          docker exec sw python -c "import json,urllib.request as u; r=u.Request('http://127.0.0.1:8790/v1/status', headers={'Authorization':'Bearer ci-token'}); s=json.load(u.urlopen(r)); assert 'whisper' in s['models'], s"
+          docker rm -f sw
+
   image:
     name: Server image
     runs-on: ubuntu-latest

@@ -14,6 +14,7 @@ import { MoveModal } from '../components/files/MoveModal'
 import { NewFolderModal } from '../components/files/NewFolderModal'
 import { PreviewModal } from '../components/files/PreviewModal'
 import { editorURL } from '../features/video/api'
+import { FilesSmartMenu } from '../features/smart/FilesSmartMenu'
 import { RenameModal } from '../components/files/RenameModal'
 import { rowActions } from '../components/files/rowActions'
 import { TagsModal } from '../components/files/TagsModal'
@@ -168,6 +169,7 @@ export function FilesPage() {
         onRename={() => setRenaming(items.find((i) => selected.has(i.id)) ?? null)}
         onDelete={() => deleteIDs([...selected])}
         onClear={() => setSelected(new Set())}
+        extra={<FilesSmartMenu items={items} selected={selected} folderId={searchQ ? undefined : folder?.id} onSelect={setSelected} />}
       />
 
       {listQ.isLoading ? (

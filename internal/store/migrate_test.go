@@ -28,6 +28,8 @@ var newTables = []string{
 	"storage_nodes", "node_locations", "copy_rules", "blob_copies", "blob_checks", "node_jobs",
 	// 13
 	"video_drafts", "video_exports", "reupload_blocks",
+	// 15
+	"smart_presets", "smart_queues", "smart_items", "smart_segments", "smart_outputs", "smart_errors",
 }
 
 // newColumns lists columns added to pre-existing tables.
@@ -58,8 +60,8 @@ func assertSchema(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 14 || LatestSchemaVersion() != 14 {
-		t.Fatalf("schema version = %d, latest = %d, want 14", v, LatestSchemaVersion())
+	if v != 15 || LatestSchemaVersion() != 15 {
+		t.Fatalf("schema version = %d, latest = %d, want 15", v, LatestSchemaVersion())
 	}
 	for _, tbl := range newTables {
 		var n int

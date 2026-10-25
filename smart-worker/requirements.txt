@@ -1,0 +1,11 @@
+# PyTorch is installed first from the PyTorch index (CPU build by default,
+# see the Dockerfile's TORCH_INDEX).
+numpy==1.26.4
+scipy==1.14.1
+huggingface_hub==0.26.5
+transformers==4.46.3
+tokenizers==0.20.3
+faster-whisper==1.1.0
+opencv-python-headless==4.10.0.84
+pillow==11.0.0
+speechbrain==1.0.2

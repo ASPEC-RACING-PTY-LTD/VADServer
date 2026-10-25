@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ArrowDownAZ, Check, Download, FolderInput, Grid2X2, List, Pencil, Search, Trash2, X } from 'lucide-react'
 import { Button, cx, IconButton, Menu } from '../ui'
 import type { Sort } from './types'
@@ -23,6 +24,7 @@ export function FilesToolbar({
   onRename,
   onDelete,
   onClear,
+  extra,
 }: {
   selectedCount: number
   searchQ: string
@@ -39,6 +41,8 @@ export function FilesToolbar({
   onRename: () => void
   onDelete: () => void
   onClear: () => void
+  /** Feature actions shown next to the type filter (e.g. smart processing). */
+  extra?: ReactNode
 }) {
   return (
     <div className="card mb-4 flex flex-wrap items-center gap-2 p-2">
@@ -69,6 +73,7 @@ export function FilesToolbar({
           <input className="input h-8 border-transparent bg-slate-100 pl-8 shadow-none dark:bg-slate-800" placeholder={searchQ ? 'Filter results' : 'Filter this folder'} value={filter} onChange={(e) => onFilter(e.target.value)} />
         </div>
       )}
+      {extra}
       <select className="input h-8 w-auto py-0" value={kind} onChange={(e) => onKind(e.target.value)} aria-label="File type">
         <option value="">All types</option>
         <option value="folder">Folders</option>

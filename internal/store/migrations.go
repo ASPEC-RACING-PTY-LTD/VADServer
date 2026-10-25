@@ -1100,4 +1100,131 @@ ALTER TABLE nodes ADD COLUMN file_created_at INTEGER;
 ALTER TABLE uploads ADD COLUMN previous_path TEXT NOT NULL DEFAULT '';
 ALTER TABLE uploads ADD COLUMN file_created_at INTEGER NOT NULL DEFAULT 0;
 `,
+	// 15: smart video processing: detection presets, persistent queues of
+	// recordings, suggested and reviewed segments, rendered clips and the
+	// error history (lifetime statistics are kept on the queue)
+	`
+CREATE TABLE smart_presets (
+	id          INTEGER PRIMARY KEY,
+	user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name        TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	filter      TEXT NOT NULL,
+	source      TEXT NOT NULL DEFAULT '',
+	created_at  INTEGER NOT NULL,
+	updated_at  INTEGER NOT NULL
+);
+CREATE INDEX smart_presets_user ON smart_presets(user_id, name);
+CREATE TABLE smart_queues (
+	id                INTEGER PRIMARY KEY,
+	user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name              TEXT NOT NULL,
+	description       TEXT NOT NULL DEFAULT '',
+	state             TEXT NOT NULL DEFAULT 'active',
+	filter            TEXT NOT NULL DEFAULT '{}',
+	presets           TEXT NOT NULL DEFAULT '[]',
+	output            TEXT NOT NULL DEFAULT '{}',
+	auto_approve      INTEGER NOT NULL DEFAULT 0,
+	filter_rev        INTEGER NOT NULL DEFAULT 1,
+	generated_count   INTEGER NOT NULL DEFAULT 0,
+	generated_bytes   INTEGER NOT NULL DEFAULT 0,
+	deleted_count     INTEGER NOT NULL DEFAULT 0,
+	deleted_bytes     INTEGER NOT NULL DEFAULT 0,
+	freed_bytes       INTEGER NOT NULL DEFAULT 0,
+	analysis_ms       INTEGER NOT NULL DEFAULT 0,
+	render_ms         INTEGER NOT NULL DEFAULT 0,
+	failures          INTEGER NOT NULL DEFAULT 0,
+	created_at        INTEGER NOT NULL,
+	updated_at        INTEGER NOT NULL,
+	completed_at      INTEGER,
+	archived_at       INTEGER
+);
+CREATE INDEX smart_queues_user ON smart_queues(user_id, state);
+CREATE TABLE smart_items (
+	id             INTEGER PRIMARY KEY,
+	queue_id       INTEGER NOT NULL REFERENCES smart_queues(id) ON DELETE CASCADE,
+	user_id        INTEGER NOT NULL,
+	node_id        INTEGER NOT NULL,
+	sha256         TEXT NOT NULL,
+	name           TEXT NOT NULL,
+	path           TEXT NOT NULL DEFAULT '',
+	size           INTEGER NOT NULL DEFAULT 0,
+	duration       REAL NOT NULL DEFAULT 0,
+	state          TEXT NOT NULL DEFAULT 'pending',
+	stage          TEXT NOT NULL DEFAULT '',
+	progress       REAL NOT NULL DEFAULT 0,
+	error          TEXT NOT NULL DEFAULT '',
+	attempts       INTEGER NOT NULL DEFAULT 0,
+	warnings       TEXT NOT NULL DEFAULT '[]',
+	detectors      TEXT NOT NULL DEFAULT '[]',
+	events         INTEGER NOT NULL DEFAULT 0,
+	eval_rev       INTEGER NOT NULL DEFAULT 0,
+	processing_ms  INTEGER NOT NULL DEFAULT 0,
+	position       INTEGER NOT NULL DEFAULT 0,
+	original_state TEXT NOT NULL DEFAULT 'kept',
+	deleted_at     INTEGER,
+	deleted_bytes  INTEGER NOT NULL DEFAULT 0,
+	freed_bytes    INTEGER NOT NULL DEFAULT 0,
+	added_at       INTEGER NOT NULL,
+	analysed_at    INTEGER,
+	reviewed_at    INTEGER,
+	updated_at     INTEGER NOT NULL,
+	UNIQUE (queue_id, node_id)
+);
+CREATE INDEX smart_items_queue ON smart_items(queue_id, state, position);
+CREATE INDEX smart_items_node ON smart_items(user_id, node_id);
+CREATE TABLE smart_segments (
+	id         INTEGER PRIMARY KEY,
+	item_id    INTEGER NOT NULL REFERENCES smart_items(id) ON DELETE CASCADE,
+	queue_id   INTEGER NOT NULL,
+	user_id    INTEGER NOT NULL,
+	start_s    REAL NOT NULL,
+	end_s      REAL NOT NULL,
+	score      REAL NOT NULL DEFAULT 0,
+	state      TEXT NOT NULL DEFAULT 'suggested',
+	origin     TEXT NOT NULL DEFAULT 'auto',
+	category   TEXT NOT NULL DEFAULT '',
+	label      TEXT NOT NULL DEFAULT '',
+	name       TEXT NOT NULL DEFAULT '',
+	reasons    TEXT NOT NULL DEFAULT '[]',
+	eval_rev   INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+CREATE INDEX smart_segments_item ON smart_segments(item_id, start_s);
+CREATE TABLE smart_outputs (
+	id          INTEGER PRIMARY KEY,
+	segment_id  INTEGER NOT NULL,
+	item_id     INTEGER NOT NULL REFERENCES smart_items(id) ON DELETE CASCADE,
+	queue_id    INTEGER NOT NULL,
+	user_id     INTEGER NOT NULL,
+	render_key  TEXT NOT NULL,
+	state       TEXT NOT NULL DEFAULT 'pending',
+	node_id     INTEGER,
+	sha256      TEXT NOT NULL DEFAULT '',
+	size        INTEGER NOT NULL DEFAULT 0,
+	name        TEXT NOT NULL DEFAULT '',
+	path        TEXT NOT NULL DEFAULT '',
+	mode        TEXT NOT NULL DEFAULT '',
+	error       TEXT NOT NULL DEFAULT '',
+	attempts    INTEGER NOT NULL DEFAULT 0,
+	render_ms   INTEGER NOT NULL DEFAULT 0,
+	created_at  INTEGER NOT NULL,
+	started_at  INTEGER,
+	finished_at INTEGER,
+	verified_at INTEGER,
+	UNIQUE (segment_id, render_key)
+);
+CREATE INDEX smart_outputs_queue ON smart_outputs(queue_id, state);
+CREATE INDEX smart_outputs_item ON smart_outputs(item_id);
+CREATE TABLE smart_errors (
+	id       INTEGER PRIMARY KEY,
+	queue_id INTEGER NOT NULL REFERENCES smart_queues(id) ON DELETE CASCADE,
+	item_id  INTEGER,
+	at       INTEGER NOT NULL,
+	stage    TEXT NOT NULL,
+	message  TEXT NOT NULL
+);
+CREATE INDEX smart_errors_queue ON smart_errors(queue_id, at);
+`,
 }

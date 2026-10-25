@@ -8,6 +8,7 @@
 #   ./install.sh auto-update on|off|status
 #   ./install.sh env-review      # add missing settings, review obsolete ones
 #   ./install.sh integrations [cloudflared]   # detect and wire up a Cloudflare Tunnel
+#   ./install.sh integrations smart [on|off]  # local AI worker for smart video processing
 #   ./install.sh kek-status      # where the server key file is and whether it exists
 #   ./install.sh install-node    # storage node agent only (systemd), into ./vad-node
 #   ./install.sh uninstall-node
@@ -125,7 +126,7 @@ DEFAULT_PORT=3000
 # The list comes from the replace/keep-modified entries of
 # deploy/managed-files.json (downloaded first); RUNTIME_FILES is the fallback
 # and must stay in sync with it (scripts/test-install checks this).
-RUNTIME_FILES="docker-compose.yml install.sh deploy/env.schema.json deploy/managed-files.json deploy/integrations/caddy/compose.caddy.yml deploy/integrations/caddy/Caddyfile deploy/integrations/cloudflared/detect.sh deploy/integrations/cloudflared/compose.cloudflared-net.yml"
+RUNTIME_FILES="docker-compose.yml install.sh deploy/env.schema.json deploy/managed-files.json deploy/integrations/caddy/compose.caddy.yml deploy/integrations/caddy/Caddyfile deploy/integrations/cloudflared/detect.sh deploy/integrations/cloudflared/compose.cloudflared-net.yml deploy/integrations/smart/compose.smart.yml"
 # User files in app/ that upgrades carry over.
 KEEP_FILES=".env docker-compose.override.yml deploy/env-approvals"
 
@@ -1295,13 +1296,57 @@ do_integrations() {
 	if [ -z "$which" ]; then
 		printf '  Enabled integrations: %s\n' "$(integrations | tr '\n' ' ' | sed 's/ *$//')"
 		[ -n "$(integrations)" ] || printf '  (none: only the vaultdock service runs)\n'
-		printf '  1) Cloudflare Tunnel: detect cloudflared and connect VaultDock\n  q) Back\n'
+		printf '  1) Cloudflare Tunnel: detect cloudflared and connect VaultDock\n'
+		printf '  2) Smart processing worker: local AI models for smart video processing\n  q) Back\n'
 		ask i "Choose" "q"
-		case "$i" in 1) which=cloudflared ;; *) return 0 ;; esac
+		case "$i" in 1) which=cloudflared ;; 2) which=smart ;; *) return 0 ;; esac
 	fi
 	case "$which" in
 	cloudflared) do_cloudflared ;;
-	*) die "Unknown integration: $which (use cloudflared)" ;;
+	smart) do_smart "${2:-}" ;;
+	*) die "Unknown integration: $which (use cloudflared or smart)" ;;
+	esac
+}
+
+# --- integrations: smart processing worker -------------------------------------
+# do_smart [on|off] runs or removes the local inference worker
+# (deploy/integrations/smart). It has no published ports and downloads no
+# models by itself: an administrator installs them in the admin console.
+do_smart() {
+	local act=${1:-} cur dir uid gid
+	if [ -z "$act" ]; then
+		if integration_enabled smart; then
+			printf '  The smart processing worker is enabled.\n'
+			ask act "Type off to disable it (on keeps it)" "on"
+		else
+			printf '  The worker runs local AI models (speech to text, sound events, scenes, faces, on-screen text).\n'
+			printf '  The image is about 2 GB; models are downloaded only when you install them (0.1-3 GB each).\n'
+			ask act "Type on to enable it" "on"
+		fi
+	fi
+	case "$act" in
+	on)
+		[ -f "$(integration_file smart)" ] || die "$(integration_file smart) is missing; upgrade first."
+		env_add VAULTDOCK_SMART_TOKEN "$(random_token)"
+		[ -n "$(env_get VAULTDOCK_SMART_TOKEN)" ] || die "VAULTDOCK_SMART_TOKEN is empty in $ENV_FILE; remove that line and run this again (a random token is then generated)."
+		dir="$(state_path)/smart-models"
+		uid=$(env_get VAULTDOCK_UID); gid=$(env_get VAULTDOCK_GID)
+		mkdir -p -- "$dir"
+		if [ "$(id -u)" = 0 ]; then chown "${uid:-65532}:${gid:-65532}" -- "$dir"; fi
+		chmod 750 -- "$dir"
+		integration_enabled smart || { cur=$(env_get VAULTDOCK_INTEGRATIONS); env_set_managed VAULTDOCK_INTEGRATIONS "${cur:+$cur,}smart"; }
+		compose up -d || die "The containers could not be started; see the messages above."
+		ok "Smart processing worker started. Install its models in the admin console (Admin > Smart processing)."
+		;;
+	off)
+		integration_enabled smart || { ok "The smart processing worker is not enabled."; return 0; }
+		compose rm -s -f smart-worker >/dev/null 2>&1 || true
+		cur=$(integrations | grep -vx smart | paste -sd, - || true)
+		env_set_managed VAULTDOCK_INTEGRATIONS "$cur"
+		compose up -d || die "The containers could not be started; see the messages above."
+		ok "Smart processing worker removed. Downloaded models stay in $(state_path)/smart-models; delete that folder to free the space."
+		;;
+	*) die "Use: install.sh integrations smart [on|off]" ;;
 	esac
 }
 
@@ -2157,7 +2202,7 @@ main() {
 	control) do_control ;;
 	control-setup) installed && ensure_control_cron ;;
 	env-review) do_env_review ;;
-	integrations) do_integrations "${2:-}" ;;
+	integrations) do_integrations "${2:-}" "${3:-}" ;;
 	kek-status) do_kek_status ;;
 	install-node) do_install_node ;;
 	uninstall-node) do_uninstall_node ;;

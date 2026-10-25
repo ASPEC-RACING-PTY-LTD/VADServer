@@ -109,6 +109,7 @@ func (a *App) Run(ctx context.Context) {
 	go a.Server.RunCopies(ctx)
 	// Video thumbnails (FFmpeg), and exports a restart interrupted.
 	go a.Server.RunMedia(ctx)
+	go a.Server.RunSmart(ctx) // smart processing queues
 	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	n := 0
