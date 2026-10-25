@@ -91,6 +91,7 @@ type Principal struct {
 	User    *store.User
 	Session *store.Session // set for browser sessions
 	Device  *store.Device  // set for signed device requests
+	APIKey  *store.APIKey  // set for diagnostics API keys (read-only /diag routes only)
 	// DeclaredBodySHA is the signed body hash for streamed bodies that the
 	// handler must verify itself (chunk uploads).
 	DeclaredBodySHA string
@@ -354,6 +355,13 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 				writeErr(w, r, err)
 				return
 			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
+			return
+		}
+		if p, err := s.authAPIKey(r); err != nil {
+			writeErr(w, r, err)
+			return
+		} else if p != nil {
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
 			return
 		}
@@ -787,6 +795,7 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountAI(rt)
 	s.mountVideoEditor(rt)
 	s.mountSmart(rt)
+	s.mountAPIKeys(rt)
 }
 
 // Handler builds the HTTP router.
@@ -808,6 +817,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 		r.Post("/auth/register", s.handleRegister)
 		r.Post("/device/enroll", s.handleEnroll)
 		r.Get("/device/enroll/{id}", s.handleEnrollStatus)
+		s.mountDiag(r)       // admin session or diagnostics API key; read-only
 		s.mountNodePublic(r) // storage nodes authenticate with their own scheme
 		s.mountNodeJobs(r)
 

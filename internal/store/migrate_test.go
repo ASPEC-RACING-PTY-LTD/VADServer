@@ -30,6 +30,8 @@ var newTables = []string{
 	"video_drafts", "video_exports", "reupload_blocks",
 	// 15
 	"smart_presets", "smart_queues", "smart_items", "smart_segments", "smart_outputs", "smart_errors",
+	// 16
+	"api_keys",
 }
 
 // newColumns lists columns added to pre-existing tables.
@@ -60,8 +62,8 @@ func assertSchema(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 15 || LatestSchemaVersion() != 15 {
-		t.Fatalf("schema version = %d, latest = %d, want 15", v, LatestSchemaVersion())
+	if v != 16 || LatestSchemaVersion() != 16 {
+		t.Fatalf("schema version = %d, latest = %d, want 16", v, LatestSchemaVersion())
 	}
 	for _, tbl := range newTables {
 		var n int

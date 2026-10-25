@@ -21,4 +21,10 @@ describe('admin tabs registry', () => {
     expect(enabledAdminTabs(all, ctx()).map((t) => t.id)).toEqual(['s', 'b'])
     expect(enabledAdminTabs(all, ctx({ isSuperuser: false, flags: new Set(['gc']) })).map((t) => t.id)).toEqual(['f', 'b'])
   })
+
+  it('links every sidebar-only tab from the sidebar', async () => {
+    const { coreModules } = await import('../../../app/core')
+    const links = new Set(coreModules.map((m) => m.nav?.to))
+    for (const t of adminTabs.filter((x) => x.inSidebar)) expect(links, `no sidebar link for /admin/${tabPath(t)}`).toContain(`/admin/${tabPath(t)}`)
+  })
 })

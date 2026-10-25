@@ -1227,4 +1227,20 @@ CREATE TABLE smart_errors (
 );
 CREATE INDEX smart_errors_queue ON smart_errors(queue_id, at);
 `,
+	// 16: API keys for the read-only diagnostics API (hash only).
+	`
+CREATE TABLE api_keys (
+	id           INTEGER PRIMARY KEY,
+	user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name         TEXT NOT NULL,
+	prefix       TEXT NOT NULL,
+	hash         TEXT NOT NULL UNIQUE,
+	scope        TEXT NOT NULL,
+	created_at   INTEGER NOT NULL,
+	expires_at   INTEGER NOT NULL,
+	last_used_at INTEGER,
+	last_used_ip TEXT NOT NULL DEFAULT '',
+	revoked_at   INTEGER
+);
+`,
 }

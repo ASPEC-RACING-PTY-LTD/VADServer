@@ -31,6 +31,7 @@ import (
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/app"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/auth"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/config"
+	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/logring"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/store"
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/web"
 )
@@ -75,7 +76,8 @@ func setupLogging(cfg *config.Config) {
 	} else {
 		h = slog.NewJSONHandler(os.Stdout, opts)
 	}
-	slog.SetDefault(slog.New(h))
+	// Recent records are also kept in memory for the diagnostics API.
+	slog.SetDefault(slog.New(logring.Wrap(h)))
 }
 
 func serve() error {

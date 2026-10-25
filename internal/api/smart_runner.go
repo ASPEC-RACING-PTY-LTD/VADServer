@@ -295,11 +295,13 @@ func (s *Server) analyseItem(parent context.Context, it *store.SmartItem) {
 		s.st.LogSmartError(ctx, it.QueueID, &it.ID, "analysis", it.Name+": the file changed since it was queued; analysing the new version")
 		it.SHA256 = node.SHA256
 	}
+	tProbe := time.Now()
 	info, err := s.mediaInfo(ctx, user.ID, node.SHA256, nil)
 	if err != nil {
 		fail(exportUserMessage(err))
 		return
 	}
+	probeMS := time.Since(tProbe).Milliseconds()
 	set := s.smartSettings()
 	if set.MaxMinutes > 0 && info.Duration > float64(set.MaxMinutes)*60 {
 		fail(fmt.Sprintf("The recording is longer than the %d minute limit set by the administrator", set.MaxMinutes))
@@ -326,6 +328,7 @@ func (s *Server) analyseItem(parent context.Context, it *store.SmartItem) {
 	src := smart.Source{UserID: user.ID, SHA256: node.SHA256, Info: info, Open: func() (*os.File, error) { return s.openBlob(ctx, user.ID, node.SHA256) }}
 	an := s.smartAnalyzer()
 	last := time.Time{}
+	tMeasure := time.Now()
 	failed, err := an.Ensure(ctx, src, keep, func(stage string, p float64) {
 		r.set(job, stage, p)
 		if time.Since(last) > 2*time.Second {
@@ -337,6 +340,8 @@ func (s *Server) analyseItem(parent context.Context, it *store.SmartItem) {
 		fail(exportUserMessage(err))
 		return
 	}
+	measureMS := time.Since(tMeasure).Milliseconds()
+	tEval := time.Now()
 	r.set(job, "finding moments", 1)
 	_ = s.st.SetSmartItemProgress(ctx, it.ID, "finding moments", 1)
 	a, err := an.Load(src, keep)
@@ -390,6 +395,9 @@ func (s *Server) analyseItem(parent context.Context, it *store.SmartItem) {
 		slog.Warn("smart analysis not saved", "item", it.ID, "err", err)
 		return
 	}
+	logSmart("analysis finished", "item", it.ID, "queue", it.QueueID, "size", node.Size, "duration_s", math.Round(info.Duration),
+		"detectors", strings.Join(keep, ","), "probe_ms", probeMS, "measure_ms", measureMS, "evaluate_ms", time.Since(tEval).Milliseconds(),
+		"total_ms", time.Since(started).Milliseconds(), "suggestions", len(segs), "failed", len(failed))
 	if q.AutoApprove {
 		r.poke()
 	}

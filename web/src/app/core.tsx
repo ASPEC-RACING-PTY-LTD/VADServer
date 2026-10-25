@@ -1,6 +1,6 @@
 import { lazy } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Activity, ArrowUpCircle, FolderOpen, HardDrive, LayoutDashboard, Monitor, RefreshCw, Shield, ShieldCheck, Trash2, Users, Workflow } from 'lucide-react'
+import { Activity, ArrowUpCircle, FolderOpen, HardDrive, LayoutDashboard, Monitor, RefreshCw, Shield, ShieldCheck, Sparkles, Trash2, Users, Workflow } from 'lucide-react'
 import { DashboardPage } from '../pages/Dashboard'
 import { FilesPage } from '../pages/Files'
 import type { FeatureModule } from './types'
@@ -54,6 +54,7 @@ export const coreModules: FeatureModule[] = [
   { id: 'admin-users', adminOnly: true, routes: [], nav: { label: 'Users', icon: Users, to: '/admin/users', order: 20, section: 'admin' } },
   { id: 'admin-devices', adminOnly: true, routes: [], nav: { label: 'Devices', icon: Monitor, to: '/admin/devices', order: 30, section: 'admin' } },
   { id: 'admin-storage', adminOnly: true, routes: [], nav: { label: 'Storage', icon: HardDrive, to: '/admin/storage', order: 40, section: 'admin' } },
+  { id: 'admin-smart', adminOnly: true, routes: [], nav: { label: 'Smart processing', icon: Sparkles, to: '/admin/smart', order: 45, section: 'admin' } },
   { id: 'admin-updates', adminOnly: true, routes: [], nav: { label: 'Updates', icon: ArrowUpCircle, to: '/admin/updates', order: 50, section: 'admin' } },
   { id: 'admin-audit', adminOnly: true, routes: [], nav: { label: 'Audit log', icon: ShieldCheck, to: '/admin/audit', order: 60, section: 'admin' } },
 ]

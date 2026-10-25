@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Cpu, Download, RefreshCw, Settings, Trash2 } from 'lucide-react'
-import { Badge, Button, ErrorState, Field, PageHeader, PageLoader, ProgressBar, Toggle, useUI } from '../../components/ui'
+import { Cpu, Download, RefreshCw, Trash2 } from 'lucide-react'
+import { Badge, Button, ErrorState, Field, PageLoader, ProgressBar, Toggle, useUI } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
 import { formatBytes } from '../../lib/format'
 import { smartApi, smartKeys, type SmartSettings } from './api'
@@ -54,7 +54,7 @@ export default function SettingsPage() {
   const res = status.data?.resources ?? {}
   return (
     <div className="space-y-5">
-      <PageHeader title="Smart processing" icon={<Settings className="size-5" />} description="Server-wide settings for every user: processing intensity, the inference worker and its models. Everything runs on this server; nothing is sent elsewhere." />
+      <p className="text-sm text-slate-500 dark:text-slate-400">Server-wide settings for every user: processing intensity, the inference worker and its models. Everything runs on this server; nothing is sent elsewhere.</p>
 
       <div className="card space-y-4 p-5">
         <h2 className="font-semibold">Processing</h2>
