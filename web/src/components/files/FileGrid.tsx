@@ -4,9 +4,14 @@ import { cx, IconButton } from '../ui'
 import { FileIcon } from '../FileIcon'
 import type { FileViewProps } from './FileTable'
 import { contentURL as defaultContentURL, type ContentURL } from './types'
+import { useVideoMedia, VideoThumb } from '../../features/video/thumbs'
 
-/** Grid view with image/video thumbnails. */
+/**
+ * Grid view with image and video thumbnails. Video thumbnails come from the server (FFmpeg) for
+ * the user's own files; other listings (snapshots) show an icon.
+ */
 export function FileGrid({ items, selected, onRowClick, onToggle, onOpen, onContextMenu, onActions, contentURL = defaultContentURL }: FileViewProps & { contentURL?: ContentURL }) {
+  const videoMedia = useVideoMedia(items, contentURL === defaultContentURL)
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
       {items.map((n, idx) => (
@@ -21,7 +26,13 @@ export function FileGrid({ items, selected, onRowClick, onToggle, onOpen, onCont
           className={cx('card group relative flex cursor-default flex-col overflow-hidden transition', selected.has(n.id) ? 'ring-2 ring-brand-500' : 'hover:shadow-md')}
         >
           <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-800/60">
-            {fileKind(n.mime, n.is_dir) === 'image' && n.mime !== 'image/svg+xml' && n.size < 25 * 1024 * 1024 ? <img src={contentURL(n.id)} alt="" loading="lazy" className="size-full object-cover" /> : fileKind(n.mime, n.is_dir) === 'video' && items.length <= 60 ? <video src={contentURL(n.id) + '#t=1'} preload="metadata" muted className="size-full object-cover" /> : <FileIcon mime={n.mime} isDir={n.is_dir} size="lg" />}
+            {fileKind(n.mime, n.is_dir) === 'image' && n.mime !== 'image/svg+xml' && n.size < 25 * 1024 * 1024 ? (
+              <img src={contentURL(n.id)} alt="" loading="lazy" className="size-full object-cover" />
+            ) : fileKind(n.mime, n.is_dir) === 'video' && contentURL === defaultContentURL ? (
+              <VideoThumb node={n} media={videoMedia.get(n.id)} />
+            ) : (
+              <FileIcon mime={n.mime} isDir={n.is_dir} size="lg" />
+            )}
           </div>
           <div className="flex items-center gap-2 p-2.5">
             <div className="min-w-0 flex-1">

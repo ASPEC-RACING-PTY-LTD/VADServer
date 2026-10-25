@@ -153,6 +153,12 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fullPath := "/" + strings.Join(append(append([]string{}, dirSegs...), name), "/")
+	// An original the user erased after exporting clips from it is not
+	// brought back by a synced PC that still has it.
+	if p.Device != nil && req.SHA256 != "" && s.st.ReuploadBlocked(r.Context(), u.ID, fullPath, req.SHA256) {
+		writeJSON(w, 200, map[string]any{"status": "complete", "result": "skipped", "node": nil})
+		return
+	}
 	if req.ModifiedAt <= 0 {
 		req.ModifiedAt = time.Now().UnixMilli()
 	}
@@ -175,6 +181,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		if linked {
 			s.blobs.Remove(r.Context(), result.Freed)
+			s.mediaCommitted(u.ID, result.Node)
 			status := "deduplicated"
 			if result.Result == "unchanged" || result.Result == "skipped" {
 				status = result.Result
@@ -871,6 +878,7 @@ func (s *Server) finalize(ctx context.Context, p *Principal, up *store.Upload) (
 	if err != nil {
 		return nil, err
 	}
+	s.mediaCommitted(up.UserID, res.Node)
 	return res, nil
 }
 

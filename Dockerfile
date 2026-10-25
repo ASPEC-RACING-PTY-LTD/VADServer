@@ -38,6 +38,11 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
         -o /out/nodes/vad-node-linux-$arch ./cmd/vad-node || exit 1; \
     done
 
+# FFmpeg and FFprobe for video thumbnails and the video editor's clip
+# exports: static builds (no shared libraries), so the runtime stays
+# distroless. Pinned; amd64 and arm64.
+FROM mwader/static-ffmpeg:7.1.1 AS ffmpeg
+
 FROM gcr.io/distroless/static-debian12:nonroot
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="VaultDock server" \
@@ -47,9 +52,10 @@ LABEL org.opencontainers.image.title="VaultDock server" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.source="https://github.com/ASPEC-RACING-PTY-LTD/vad-server"
 # The licence and third-party notices ship with the binary (BSD/Apache notice terms).
-COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/vaultdock/
+COPY LICENSE THIRD_PARTY_NOTICES.md FFMPEG_NOTICE.md /usr/share/doc/vaultdock/
 COPY --from=build /out/vaultdock /usr/local/bin/vaultdock
 COPY --from=build /out/nodes /usr/local/share/vaultdock/nodes
+COPY --from=ffmpeg /ffmpeg /ffprobe /usr/local/bin/
 COPY --from=build --chown=65532:65532 /out/state /state
 COPY --from=build --chown=65532:65532 /out/storage /storage
 ENV VAULTDOCK_STATE_DIR=/state \

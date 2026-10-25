@@ -438,7 +438,7 @@ func trashTx(ctx context.Context, tx *sql.Tx, userID, id int64) error {
 		) UPDATE nodes SET deleted_at = ? WHERE id IN (SELECT id FROM sub)`, n.ID, userID, t); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE nodes SET deleted_at = ?, trash_root = 1, original_parent_id = parent_id, updated_at = ? WHERE id = ?", t, t, n.ID)
+	_, err = tx.ExecContext(ctx, "UPDATE nodes SET deleted_at = ?, trash_root = 1, original_parent_id = parent_id, trash_expires_at = NULL, updated_at = ? WHERE id = ?", t, t, n.ID)
 	return err
 }
 

@@ -13,6 +13,7 @@ import { FileTable } from '../components/files/FileTable'
 import { MoveModal } from '../components/files/MoveModal'
 import { NewFolderModal } from '../components/files/NewFolderModal'
 import { PreviewModal } from '../components/files/PreviewModal'
+import { editorURL } from '../features/video/api'
 import { RenameModal } from '../components/files/RenameModal'
 import { rowActions } from '../components/files/rowActions'
 import { TagsModal } from '../components/files/TagsModal'
@@ -110,6 +111,7 @@ export function FilesPage() {
       move: setMoving,
       editTags: setTagging,
       trash: deleteIDs,
+      editVideo: (x) => navigate(editorURL(x.id)),
     })
 
   const previewList = items.filter((i) => !i.is_dir && previewable(i.mime))
@@ -183,7 +185,7 @@ export function FilesPage() {
       {dragOver && <DropOverlay folderPath={folderPath} />}
 
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={menuFor(ctx.node)} onClose={() => setCtx(null)} />}
-      {preview && <PreviewModal node={preview} list={previewList} onNavigate={setPreview} onClose={() => setPreview(null)} />}
+      {preview && <PreviewModal node={preview} list={previewList} onNavigate={setPreview} onClose={() => setPreview(null)} onEditVideo={(x) => navigate(editorURL(x.id))} />}
       <UploadsModal
         open={uploadsOpen}
         onClose={() => {

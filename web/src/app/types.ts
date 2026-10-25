@@ -5,6 +5,8 @@ import type { LucideIcon } from 'lucide-react'
 export interface FeatureRoute {
   path: string
   component: ComponentType
+  /** Full-screen workspace: rendered without the sidebar and header (e.g. the video editor). */
+  fullscreen?: boolean
 }
 
 /** Sidebar entry for a feature. */

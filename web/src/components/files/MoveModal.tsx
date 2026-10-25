@@ -6,7 +6,21 @@ import { Button, Modal, PageLoader } from '../ui'
 import { FileIcon } from '../FileIcon'
 import type { Crumb, Node } from './types'
 
-export function MoveModal({ ids, onClose, onMove, title = 'Move to folder' }: { ids: number[] | null; onClose: () => void; onMove: (target: number) => void; title?: string }) {
+export function MoveModal({
+  ids,
+  onClose,
+  onMove,
+  title = 'Move to folder',
+  actionLabel = 'Move here',
+  description,
+}: {
+  ids: number[] | null
+  onClose: () => void
+  onMove: (target: number) => void
+  title?: string
+  actionLabel?: string
+  description?: string
+}) {
   const [cur, setCur] = useState<string>('root')
   useEffect(() => {
     if (ids) setCur('root')
@@ -19,7 +33,7 @@ export function MoveModal({ ids, onClose, onMove, title = 'Move to folder' }: { 
       open={!!ids}
       onClose={onClose}
       title={title}
-      description={ids ? `${ids.length} item(s) selected` : undefined}
+      description={description ?? (ids ? `${ids.length} item(s) selected` : undefined)}
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -31,7 +45,7 @@ export function MoveModal({ ids, onClose, onMove, title = 'Move to folder' }: { 
               onClose()
             }}
           >
-            Move here
+            {actionLabel}
           </Button>
         </>
       }

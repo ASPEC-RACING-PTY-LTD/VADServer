@@ -107,6 +107,8 @@ func (a *App) Run(ctx context.Context) {
 	go a.Blobs.RunExtractSweeper(ctx, time.Minute, storage.ExtractIdle)
 	// File copies (copy rules, storage nodes) and the read fallback.
 	go a.Server.RunCopies(ctx)
+	// Video thumbnails (FFmpeg), and exports a restart interrupted.
+	go a.Server.RunMedia(ctx)
 	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	n := 0

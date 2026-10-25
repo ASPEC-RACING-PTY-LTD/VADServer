@@ -55,7 +55,9 @@ type Server struct {
 	lastTouch map[string]time.Time
 
 	updates *updateChecker
-	ops     *opRunner // long operations (operations.go)
+	ops     *opRunner     // long operations (operations.go)
+	media   *mediaService // video thumbnails and frames (media.go)
+	exports *exportRunner // video clip exports (video_editor.go)
 }
 
 func New(cfg *config.Config, st *store.Store, blobs *storage.Manager, settings *SettingsCache, geo *Geo) *Server {
@@ -63,6 +65,8 @@ func New(cfg *config.Config, st *store.Store, blobs *storage.Manager, settings *
 		cfg: cfg, st: st, blobs: blobs, settings: settings, geo: geo, started: time.Now(),
 		updates:       newUpdateChecker(cfg.UpdateRepo, cfg.UpdateCheck, cfg.AutoUpdate),
 		ops:           newOpRunner(),
+		media:         newMediaService(cfg.StateDir),
+		exports:       newExportRunner(),
 		loginLimiter:  auth.NewLimiter(20, 10),
 		enrollLimiter: auth.NewLimiter(10, 5),
 		apiLimiter:    auth.NewLimiter(6000, 1200),
@@ -779,6 +783,7 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountReadiness(rt)
 	s.mountNotifyPrefs(rt)
 	s.mountAI(rt)
+	s.mountVideoEditor(rt)
 }
 
 // Handler builds the HTTP router.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Download, Eye } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Clapperboard, Download, Eye } from 'lucide-react'
 import { ApiError, errorMessage } from '../../lib/api'
 import { fileKind, formatBytes, formatDate, previewable } from '../../lib/format'
 import { Badge, Button, EmptyState, ErrorState, Modal, PageLoader } from '../ui'
@@ -24,7 +24,22 @@ function TextPreview({ id, contentURL }: { id: number; contentURL: ContentURL })
 }
 
 /** Full-screen preview with previous/next navigation over `list` (arrow keys too). */
-export function PreviewModal({ node, list, onNavigate, onClose, contentURL = defaultContentURL }: { node: Node; list: Node[]; onNavigate: (n: Node) => void; onClose: () => void; contentURL?: ContentURL }) {
+export function PreviewModal({
+  node,
+  list,
+  onNavigate,
+  onClose,
+  onEditVideo,
+  contentURL = defaultContentURL,
+}: {
+  node: Node
+  list: Node[]
+  onNavigate: (n: Node) => void
+  onClose: () => void
+  /** Shows "Edit video" for videos (the user's own files). */
+  onEditVideo?: (n: Node) => void
+  contentURL?: ContentURL
+}) {
   const k = fileKind(node.mime, false)
   const idx = list.findIndex((n) => n.id === node.id)
   const prev = idx > 0 ? list[idx - 1] : null
@@ -61,6 +76,11 @@ export function PreviewModal({ node, list, onNavigate, onClose, contentURL = def
             <Button icon={<ArrowRight className="size-4" />} disabled={!next} onClick={() => next && onNavigate(next)}>
               Next
             </Button>
+            {k === 'video' && onEditVideo && (
+              <Button icon={<Clapperboard className="size-4" />} onClick={() => onEditVideo(node)}>
+                Edit video
+              </Button>
+            )}
             <a href={contentURL(node.id, true)}>
               <Button variant="primary" icon={<Download className="size-4" />}>
                 Download

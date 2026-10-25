@@ -1056,4 +1056,39 @@ ALTER TABLE users ADD COLUMN failures_dismissed_id INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE uploads ADD COLUMN client_compressed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE devices ADD COLUMN direct_reset_gen INTEGER NOT NULL DEFAULT 0;
 `,
+	// 13: video editor (drafts and clip exports), a per-item trash expiry
+	// and blocked device re-uploads of originals erased after an export
+	`
+CREATE TABLE video_drafts (
+	id             INTEGER PRIMARY KEY,
+	user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	source_node_id INTEGER NOT NULL,
+	source_sha256  TEXT NOT NULL,
+	source_name    TEXT NOT NULL,
+	name           TEXT NOT NULL,
+	data           TEXT NOT NULL DEFAULT '{}',
+	created_at     INTEGER NOT NULL,
+	updated_at     INTEGER NOT NULL
+);
+CREATE INDEX video_drafts_user ON video_drafts(user_id, updated_at);
+CREATE TABLE video_exports (
+	id             INTEGER PRIMARY KEY,
+	user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	source_node_id INTEGER NOT NULL,
+	state          TEXT NOT NULL DEFAULT 'queued',
+	request        TEXT NOT NULL DEFAULT '{}',
+	progress       TEXT NOT NULL DEFAULT '{}',
+	created_at     INTEGER NOT NULL,
+	finished_at    INTEGER
+);
+CREATE INDEX video_exports_user ON video_exports(user_id, id);
+ALTER TABLE nodes ADD COLUMN trash_expires_at INTEGER;
+CREATE TABLE reupload_blocks (
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	path       TEXT NOT NULL COLLATE NOCASE,
+	sha256     TEXT NOT NULL,
+	expires_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, path, sha256)
+);
+`,
 }

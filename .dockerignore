@@ -1,6 +1,6 @@
 # The image build needs: go.mod, go.sum, sdk/ (the vendored shared SDK), cmd/,
-# internal/, web/ (sources, not node_modules or dist), LICENSE and
-# THIRD_PARTY_NOTICES.md.
+# internal/, web/ (sources, not node_modules or dist), LICENSE,
+# THIRD_PARTY_NOTICES.md and FFMPEG_NOTICE.md.
 .git
 .github
 .claude

@@ -816,8 +816,20 @@ func (s *Server) RunMaintenance(ctx context.Context, orphans bool) map[string]an
 			slog.Error("trash purge failed", "err", err)
 		}
 	}
+	// Originals erased after a clip export keep their own (shorter) expiry.
+	if n, freed, err := s.st.PurgeExpiredTrash(ctx); err == nil {
+		s.blobs.Remove(ctx, freed)
+		if n > 0 {
+			res["trash_expired"] = n
+		}
+	} else {
+		slog.Error("trash expiry purge failed", "err", err)
+	}
+	s.st.PruneReuploadBlocks(ctx)
+	s.st.PruneVideoExports(ctx, time.Now().Add(-30*24*time.Hour).UnixMilli())
 	s.st.PruneActivity(ctx, time.Now().Add(-time.Duration(st.ActivityRetentionDays)*24*time.Hour).UnixMilli())
 	if orphans {
+		s.sweepMedia(ctx)
 		n, err := s.blobs.CleanOrphans(ctx, 2*time.Hour)
 		if err != nil {
 			slog.Error("orphan cleanup failed", "err", err)

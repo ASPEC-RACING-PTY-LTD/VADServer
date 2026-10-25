@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
@@ -18,6 +18,13 @@ function AppRoutes() {
   )
 }
 
+/** Whether the current URL is a full-screen route (no sidebar or header). */
+function useFullscreenRoute() {
+  const ctx = useFeatureContext()
+  const loc = useLocation()
+  return enabledModules(ctx).some((m) => m.routes.some((r) => r.fullscreen && matchPath(r.path, loc.pathname)))
+}
+
 export function App() {
   const { state } = useAuth()
   if (state.status === 'loading') {
@@ -29,6 +36,17 @@ export function App() {
   }
   if (state.status === 'anonymous') {
     return state.needsSetup ? <SetupPage tokenRequired={state.tokenRequired} /> : <LoginPage registration={state.registration} siteName={state.siteName} />
+  }
+  return <SignedIn />
+}
+
+function SignedIn() {
+  if (useFullscreenRoute()) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AppRoutes />
+      </Suspense>
+    )
   }
   return (
     <Layout>
