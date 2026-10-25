@@ -176,8 +176,7 @@ jobs:
           cache-to: type=gha,scope=smart-worker-image,mode=max
           provenance: false
       - name: Summary
-        run: printf 'Pushed `%s:%s` (%s)
-' "$WORKER_IMAGE" "$VERSION" "$CHANNEL" >> "$GITHUB_STEP_SUMMARY"
+        run: printf 'Pushed `%s:%s` (%s)\n' "$WORKER_IMAGE" "$VERSION" "$CHANNEL" >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     name: Publish release
