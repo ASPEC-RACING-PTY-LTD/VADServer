@@ -214,7 +214,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 				User: u, DirSegs: dirSegs, Name: name, Size: req.Size, SHA256: req.SHA256, Mime: mimetypes.ByName(name),
 				ModifiedAt: req.ModifiedAt, Tags: req.Tags, OnConflict: req.OnConflict, DeviceID: p.deviceID(), LocationID: loc,
 				KeepReplaced: settings.KeepReplacedVersions,
-				BaseSHA256: req.BaseSHA256, PrevSegs: prevSegs(req.PreviousPath), FileCreatedAt: req.FileCreatedAt,
+				BaseSHA256:   req.BaseSHA256, PrevSegs: prevSegs(req.PreviousPath), FileCreatedAt: req.FileCreatedAt,
 			})
 			return cerr
 		})
@@ -286,7 +286,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		ChunkSize: chunk, ChunksTotal: total, LocationID: locID, ModifiedAt: req.ModifiedAt, Tags: req.Tags, OnConflict: req.OnConflict,
 		Status: "open", CreatedAt: now.UnixMilli(), UpdatedAt: now.UnixMilli(), ExpiresAt: now.Add(s.cfg.UploadSessionTTL).UnixMilli(),
 		ClientCompressed: req.Compressed,
-		BaseSHA256: req.BaseSHA256, PreviousPath: req.PreviousPath, FileCreatedAt: req.FileCreatedAt,
+		BaseSHA256:       req.BaseSHA256, PreviousPath: req.PreviousPath, FileCreatedAt: req.FileCreatedAt,
 	}
 	tmp, err := s.blobs.TempPath(locID, up.ID)
 	if err != nil {
@@ -920,7 +920,7 @@ func (s *Server) finalize(ctx context.Context, p *Principal, up *store.Upload) (
 			User: user, DirSegs: segs[:len(segs)-1], Name: name, Size: up.Size, SHA256: sum, Mime: mt, ModifiedAt: up.ModifiedAt,
 			Tags: up.Tags, OnConflict: up.OnConflict, DeviceID: up.DeviceID, LocationID: loc, TransferID: up.TransferID, UploadID: up.ID,
 			KeepReplaced: s.settings.Get().KeepReplacedVersions,
-			BaseSHA256: up.BaseSHA256, PrevSegs: prevSegs(up.PreviousPath), FileCreatedAt: up.FileCreatedAt,
+			BaseSHA256:   up.BaseSHA256, PrevSegs: prevSegs(up.PreviousPath), FileCreatedAt: up.FileCreatedAt,
 		})
 		return cerr
 	})
