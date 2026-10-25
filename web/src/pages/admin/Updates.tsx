@@ -80,7 +80,7 @@ function HelperMissing({ data }: { data: UpdateStatus }) {
       <p className="text-sm text-amber-700 dark:text-amber-300">
         {data.helper_seen_at
           ? `The server's update helper last checked in ${timeAgo(data.helper_seen_at * 1000)}. It runs from cron on the server; check that cron is running.`
-          : "The buttons need the server's update helper, which the installer sets up. Run this once on the server; after that, updates are installed from here."}
+          : "One-time setup: this server has no update helper yet, and a container cannot install one on its own host. Run this once on the server. It upgrades VaultDock and sets up the helper; from then on, Upgrade and Automatic updates work from this page."}
       </p>
       <CommandLine command={data.upgrade_command} />
     </div>

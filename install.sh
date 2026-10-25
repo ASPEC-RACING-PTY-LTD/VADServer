@@ -1591,7 +1591,9 @@ do_upgrade() {
 	if compose up -d --remove-orphans && wait_healthy; then
 		rm -rf -- "$APP.old"
 		ok "Upgrade complete. Backup kept at $bk"
-		ensure_control_cron
+		# The new installer sets up the control job: an older copy of this
+		# script running the upgrade may not know how.
+		VAULTDOCK_DIR="$DIR" "$APP/install.sh" control-setup || ensure_control_cron
 		link_source_env
 		finish_image_switch
 		if [ -n "$MODIFIED_FILES" ]; then warn "Locally modified files:$MODIFIED_FILES (see the .new/.local copies in $APP)."; fi
@@ -1681,15 +1683,53 @@ control_line() {
 		"$DIR" "$APP/install.sh" "$DIR/logs/control.log" "$CONTROL_TAG"
 }
 
-# ensure_control_cron installs the control job (install, upgrade).
+# ensure_control_cron installs the control job (install, upgrade), makes sure
+# cron is running and writes the first heartbeat, so the admin console shows
+# its buttons right away instead of after the first cron run.
 ensure_control_cron() {
 	if ! command -v crontab >/dev/null 2>&1; then
 		warn "cron is not installed, so the admin console cannot install updates itself. Install cron and run '$APP/install.sh upgrade' again, or upgrade from the command line."
 		return 0
 	fi
 	mkdir -p -- "$DIR/logs"
-	{ crontab -l 2>/dev/null | grep -vF "$CONTROL_TAG" || true; control_line; } | crontab - ||
+	if ! { crontab -l 2>/dev/null | grep -vF "$CONTROL_TAG" || true; control_line; } | crontab -; then
 		warn "Could not add the control job to cron; the admin console cannot install updates itself."
+		return 0
+	fi
+	if ! cron_running; then
+		warn "cron is installed but not running, so the admin console cannot install updates itself. Start it (for example: systemctl enable --now cron) and the buttons appear within a minute."
+		return 0
+	fi
+	local ctl
+	if ctl=$(control_dir) && ctl_heartbeat "$ctl"; then
+		ok "Admin console updates are set up: Admin > Updates can upgrade VaultDock and switch automatic updates from now on."
+	else
+		warn "Could not write to $(state_path)/control; the admin console cannot install updates itself. Check that this user can write there."
+	fi
+}
+
+# cron_running: a cron daemon is running, or one was started now. Unknown
+# (no pgrep) counts as running.
+cron_running() {
+	command -v pgrep >/dev/null 2>&1 || return 0
+	if pgrep -x cron || pgrep -x crond || pgrep -x cronie; then return 0; fi >/dev/null 2>&1
+	[ "$(id -u)" = 0 ] && command -v systemctl >/dev/null 2>&1 || return 1
+	local unit
+	for unit in cron crond cronie; do
+		if systemctl enable --now "$unit" >/dev/null 2>&1; then
+			ok "Started the $unit service"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# control_dir prints <state>/control, created and writable for the container.
+control_dir() {
+	local ctl; ctl="$(state_path)/control"
+	mkdir -p -- "$ctl" 2>/dev/null || return 1
+	if [ "$(id -u)" = 0 ]; then chown --reference="$(state_path)" -- "$ctl" 2>/dev/null || true; fi
+	printf '%s' "$ctl"
 }
 
 remove_control_cron() {
@@ -1722,9 +1762,7 @@ ctl_heartbeat() {
 
 do_control() {
 	installed || return 0
-	local ctl; ctl="$(state_path)/control"
-	mkdir -p -- "$ctl" 2>/dev/null || return 0
-	if [ "$(id -u)" = 0 ]; then chown --reference="$(state_path)" -- "$ctl" 2>/dev/null || true; fi
+	local ctl; ctl=$(control_dir) || return 0
 	# One run at a time: an upgrade takes longer than a minute.
 	exec 9>"$DIR/.control.lock"
 	if command -v flock >/dev/null 2>&1; then flock -n 9 || return 0; fi
@@ -2117,6 +2155,7 @@ main() {
 	status) do_status ;;
 	auto-update) do_auto_update "${2:-status}" ;;
 	control) do_control ;;
+	control-setup) installed && ensure_control_cron ;;
 	env-review) do_env_review ;;
 	integrations) do_integrations "${2:-}" ;;
 	kek-status) do_kek_status ;;
