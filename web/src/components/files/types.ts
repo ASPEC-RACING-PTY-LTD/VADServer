@@ -8,6 +8,8 @@ export type Node = {
   modified_at: number
   created_at: number
   updated_at: number
+  /** Creation time on the device that uploaded the file (created_at is when VaultDock stored it). */
+  file_created_at?: number
   tags: string[]
   path?: string
   child_count?: number

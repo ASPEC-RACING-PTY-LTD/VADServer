@@ -654,7 +654,7 @@ var knownFeatures = []string{
 	wire.FeatureVersions, wire.FeatureSyncTwoWay, wire.FeatureProfiles, wire.FeatureModules,
 	wire.FeatureDestinations, wire.FeatureAI, wire.FeatureDeployEnv, wire.FeatureRestore,
 	wire.FeatureUploadZstd, wire.FeatureUploadCompressedFlag, wire.FeatureDirectUpload,
-	wire.FeatureDeferredFinish,
+	wire.FeatureDeferredFinish, wire.FeatureUploadIdentity,
 }
 
 var (

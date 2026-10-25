@@ -59,7 +59,7 @@ export function PreviewModal({
       onClose={onClose}
       size="full"
       title={node.name}
-      description={`${formatBytes(node.size)} · modified ${formatDate(node.modified_at)}`}
+      description={`${formatBytes(node.size)}${node.file_created_at ? ` · created ${formatDate(node.file_created_at)}` : ''} · modified ${formatDate(node.modified_at)}`}
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">

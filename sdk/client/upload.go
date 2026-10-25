@@ -30,6 +30,14 @@ type UploadRequest struct {
 	// saves bytes (wire.FeatureUploadCompressedFlag); set it only for servers
 	// that advertise the flag.
 	Compressed bool `json:"compressed,omitempty"`
+	// Identity of an updated file (wire.FeatureUploadIdentity); set them
+	// only for servers that advertise the feature. BaseSHA256 is the content
+	// this device last uploaded to Path (or PreviousPath), PreviousPath the
+	// remote path before a local rename or move, FileCreatedAt the file's
+	// creation time on the device (unix ms).
+	BaseSHA256    string `json:"base_sha256,omitempty"`
+	PreviousPath  string `json:"previous_path,omitempty"`
+	FileCreatedAt int64  `json:"file_created_at,omitempty"`
 }
 
 type UploadSession struct {

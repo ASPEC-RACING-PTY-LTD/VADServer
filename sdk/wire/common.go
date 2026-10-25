@@ -80,6 +80,13 @@ const (
 	// "X-VD-Finalize: defer" queues the finish and answers 202 without
 	// waiting; POST /uploads/results reports the outcomes later.
 	FeatureDeferredFinish = "upload.deferred_finish"
+	// FeatureUploadIdentity: an upload request may carry base_sha256 (the
+	// content this device last uploaded to the path), previous_path (where
+	// that content was before a local rename or move) and file_created_at
+	// (the file's creation time on the device). The server then updates the
+	// existing file in place, keeping its id, tags and dates, instead of
+	// treating the new content as a conflict or a new file.
+	FeatureUploadIdentity = "upload.identity"
 )
 
 // List limits for ?cursor=&limit= (api-v1 §1).

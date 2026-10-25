@@ -1091,4 +1091,13 @@ CREATE TABLE reupload_blocks (
 	PRIMARY KEY (user_id, path, sha256)
 );
 `,
+	// 14: file identity across edits: a file's creation time on the device
+	// that uploaded it, and what an upload session keeps until it is
+	// finished (base content in uploads.base_sha256 from 6, the path before
+	// a rename, the creation time)
+	`
+ALTER TABLE nodes ADD COLUMN file_created_at INTEGER;
+ALTER TABLE uploads ADD COLUMN previous_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE uploads ADD COLUMN file_created_at INTEGER NOT NULL DEFAULT 0;
+`,
 }

@@ -40,6 +40,44 @@ type uploadReq struct {
 	// compressed where that saves bytes, so the server keeps its frames and
 	// does not try again the chunks that arrive raw.
 	Compressed bool `json:"compressed"`
+	// Identity of an updated file (upload.identity, see store.CommitRequest).
+	BaseSHA256    string `json:"base_sha256"`
+	PreviousPath  string `json:"previous_path"`
+	FileCreatedAt int64  `json:"file_created_at"`
+}
+
+func init() { implementFeature(wire.FeatureUploadIdentity) }
+
+// checkIdentity validates the identity fields of an upload request. An
+// implausible creation time is dropped rather than refused.
+func checkIdentity(req *uploadReq) error {
+	req.BaseSHA256 = strings.ToLower(strings.TrimSpace(req.BaseSHA256))
+	if req.BaseSHA256 != "" && !storage.ValidSHA256(req.BaseSHA256) {
+		return errf(400, "invalid_hash", "base_sha256 must be 64 lower-case hex characters")
+	}
+	if req.PreviousPath != "" {
+		segs, err := pathutil.Split(req.PreviousPath)
+		if err != nil || len(segs) == 0 {
+			return errf(400, "invalid_path", "previous_path is not a valid file path")
+		}
+		req.PreviousPath = "/" + strings.Join(segs, "/")
+	}
+	if req.FileCreatedAt < 0 || req.FileCreatedAt > time.Now().Add(24*time.Hour).UnixMilli() {
+		req.FileCreatedAt = 0
+	}
+	return nil
+}
+
+// prevSegs splits a stored previous_path ("" gives nil).
+func prevSegs(p string) []string {
+	if p == "" {
+		return nil
+	}
+	segs, err := pathutil.Split(p)
+	if err != nil {
+		return nil
+	}
+	return segs
 }
 
 type uploadView struct {
@@ -124,6 +162,10 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(400, "hash_required", "Device uploads must declare the file's sha256"))
 		return
 	}
+	if err := checkIdentity(&req); err != nil {
+		writeErr(w, r, err)
+		return
+	}
 	if req.Size < 0 || req.Size > 1<<46 {
 		writeErr(w, r, errf(400, "invalid_size", "Invalid file size"))
 		return
@@ -172,6 +214,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 				User: u, DirSegs: dirSegs, Name: name, Size: req.Size, SHA256: req.SHA256, Mime: mimetypes.ByName(name),
 				ModifiedAt: req.ModifiedAt, Tags: req.Tags, OnConflict: req.OnConflict, DeviceID: p.deviceID(), LocationID: loc,
 				KeepReplaced: settings.KeepReplacedVersions,
+				BaseSHA256: req.BaseSHA256, PrevSegs: prevSegs(req.PreviousPath), FileCreatedAt: req.FileCreatedAt,
 			})
 			return cerr
 		})
@@ -183,11 +226,15 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 			s.blobs.Remove(r.Context(), result.Freed)
 			s.mediaCommitted(u.ID, result.Node)
 			status := "deduplicated"
-			if result.Result == "unchanged" || result.Result == "skipped" {
+			if result.Result == "unchanged" || result.Result == "skipped" || result.Result == "moved" {
 				status = result.Result
 			}
 			_ = s.st.RecordTransfer(r.Context(), store.Transfer{UserID: u.ID, DeviceID: p.deviceID(), Path: fullPath, Size: req.Size, BytesDone: 0, Status: status, Source: sourceName(p)})
-			if result.Result != "unchanged" && result.Result != "skipped" {
+			switch result.Result {
+			case "unchanged", "skipped":
+			case "moved":
+				s.activity(r, u.ID, "file.moved", result.Node.Path, "moved from "+req.PreviousPath+" (renamed or moved on the device)", false)
+			default:
 				s.activity(r, u.ID, "file.uploaded", result.Node.Path, "deduplicated (content already stored)", false)
 			}
 			writeJSON(w, 200, map[string]any{"status": "complete", "result": status, "node": result.Node})
@@ -239,6 +286,7 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		ChunkSize: chunk, ChunksTotal: total, LocationID: locID, ModifiedAt: req.ModifiedAt, Tags: req.Tags, OnConflict: req.OnConflict,
 		Status: "open", CreatedAt: now.UnixMilli(), UpdatedAt: now.UnixMilli(), ExpiresAt: now.Add(s.cfg.UploadSessionTTL).UnixMilli(),
 		ClientCompressed: req.Compressed,
+		BaseSHA256: req.BaseSHA256, PreviousPath: req.PreviousPath, FileCreatedAt: req.FileCreatedAt,
 	}
 	tmp, err := s.blobs.TempPath(locID, up.ID)
 	if err != nil {
@@ -872,6 +920,7 @@ func (s *Server) finalize(ctx context.Context, p *Principal, up *store.Upload) (
 			User: user, DirSegs: segs[:len(segs)-1], Name: name, Size: up.Size, SHA256: sum, Mime: mt, ModifiedAt: up.ModifiedAt,
 			Tags: up.Tags, OnConflict: up.OnConflict, DeviceID: up.DeviceID, LocationID: loc, TransferID: up.TransferID, UploadID: up.ID,
 			KeepReplaced: s.settings.Get().KeepReplacedVersions,
+			BaseSHA256: up.BaseSHA256, PrevSegs: prevSegs(up.PreviousPath), FileCreatedAt: up.FileCreatedAt,
 		})
 		return cerr
 	})

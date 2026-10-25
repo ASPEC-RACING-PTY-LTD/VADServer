@@ -20,38 +20,42 @@ var (
 )
 
 type Node struct {
-	ID         int64    `json:"id"`
-	ParentID   *int64   `json:"parent_id"`
-	Name       string   `json:"name"`
-	IsDir      bool     `json:"is_dir"`
-	Size       int64    `json:"size"`
-	SHA256     string   `json:"sha256,omitempty"`
-	Mime       string   `json:"mime"`
-	CreatedAt  int64    `json:"created_at"`
-	ModifiedAt int64    `json:"modified_at"`
-	UpdatedAt  int64    `json:"updated_at"`
-	DeletedAt  *int64   `json:"deleted_at,omitempty"`
-	OriginDev  *int64   `json:"origin_device_id,omitempty"`
-	Tags       []string `json:"tags"`
-	Path       string   `json:"path,omitempty"`
-	ChildCount *int64   `json:"child_count,omitempty"`
-	userID     int64
-	origParent *int64
+	ID         int64  `json:"id"`
+	ParentID   *int64 `json:"parent_id"`
+	Name       string `json:"name"`
+	IsDir      bool   `json:"is_dir"`
+	Size       int64  `json:"size"`
+	SHA256     string `json:"sha256,omitempty"`
+	Mime       string `json:"mime"`
+	CreatedAt  int64  `json:"created_at"`
+	ModifiedAt int64  `json:"modified_at"`
+	UpdatedAt  int64  `json:"updated_at"`
+	// FileCreatedAt is the file's creation time on the device that first
+	// uploaded it (CreatedAt is when VaultDock stored it). Kept when the
+	// content is updated.
+	FileCreatedAt *int64   `json:"file_created_at,omitempty"`
+	DeletedAt     *int64   `json:"deleted_at,omitempty"`
+	OriginDev     *int64   `json:"origin_device_id,omitempty"`
+	Tags          []string `json:"tags"`
+	Path          string   `json:"path,omitempty"`
+	ChildCount    *int64   `json:"child_count,omitempty"`
+	userID        int64
+	origParent    *int64
 }
 
-const nodeCols = `id, user_id, parent_id, name, is_dir, size, COALESCE(sha256,''), mime, created_at, modified_at, updated_at, deleted_at, origin_device_id, original_parent_id`
+const nodeCols = `id, user_id, parent_id, name, is_dir, size, COALESCE(sha256,''), mime, created_at, modified_at, updated_at, deleted_at, origin_device_id, original_parent_id, file_created_at`
 
 func scanNode(sc interface{ Scan(...any) error }) (*Node, error) {
 	var n Node
-	var parent, del, dev, orig sql.NullInt64
-	err := sc.Scan(&n.ID, &n.userID, &parent, &n.Name, &n.IsDir, &n.Size, &n.SHA256, &n.Mime, &n.CreatedAt, &n.ModifiedAt, &n.UpdatedAt, &del, &dev, &orig)
+	var parent, del, dev, orig, fc sql.NullInt64
+	err := sc.Scan(&n.ID, &n.userID, &parent, &n.Name, &n.IsDir, &n.Size, &n.SHA256, &n.Mime, &n.CreatedAt, &n.ModifiedAt, &n.UpdatedAt, &del, &dev, &orig, &fc)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	n.ParentID, n.DeletedAt, n.OriginDev, n.origParent = nullInt(parent), nullInt(del), nullInt(dev), nullInt(orig)
+	n.ParentID, n.DeletedAt, n.OriginDev, n.origParent, n.FileCreatedAt = nullInt(parent), nullInt(del), nullInt(dev), nullInt(orig), nullInt(fc)
 	n.Tags = []string{}
 	return &n, nil
 }
