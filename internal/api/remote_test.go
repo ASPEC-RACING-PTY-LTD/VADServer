@@ -107,6 +107,11 @@ func TestRemoteStorageNode(t *testing.T) {
 	uid := int64(me["user"].(map[string]any)["id"].(float64))
 	admin.must("PUT", fmt.Sprintf("/api/v1/admin/users/%d/upload-origin", uid), map[string]any{"node_id": nid}, 200)
 	admin.must("POST", fmt.Sprintf("/api/v1/admin/users/%d/move-to-node", uid), map[string]any{}, 202)
+	for _, u := range admin.must("GET", "/api/v1/admin/users", nil, 200)["users"].([]any) {
+		if m := u.(map[string]any); m["username"] == "bob" && m["upload_origin_node_id"] != float64(nid) {
+			t.Fatalf("user list origin: %v", m["upload_origin_node_id"])
+		}
+	}
 	waitFor(t, 60*time.Second, "file moved", func() bool {
 		st := admin.must("GET", fmt.Sprintf("/api/v1/admin/nodes/%d/remote", nid), nil, 200)["stats"].(map[string]any)
 		ok, _ := st["files"].(map[string]any)["ok"].(float64)

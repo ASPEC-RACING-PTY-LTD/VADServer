@@ -17,6 +17,8 @@ type User struct {
 	QuotaBytes   int64  `json:"quota_bytes"`
 	UsedBytes    int64  `json:"used_bytes"`
 	LocationID   *int64 `json:"location_id"`
+	// UploadOrigin is the remote node keeping this user's files (nil: this server).
+	UploadOrigin *int64 `json:"upload_origin_node_id"`
 	RootID       int64  `json:"root_id"`
 	CreatedAt    int64  `json:"created_at"`
 	UpdatedAt    int64  `json:"updated_at"`
@@ -29,12 +31,12 @@ var ErrInvalidQuota = errors.New("quota must not be negative")
 
 func (u *User) IsAdmin() bool { return u.Role == "admin" }
 
-const userCols = `id, username, COALESCE(email,''), display_name, role, disabled, quota_bytes, used_bytes, location_id, COALESCE(root_id,0), created_at, updated_at, last_login_at, password_hash`
+const userCols = `id, username, COALESCE(email,''), display_name, role, disabled, quota_bytes, used_bytes, location_id, COALESCE(root_id,0), created_at, updated_at, last_login_at, password_hash, upload_origin_node_id`
 
 func scanUser(sc interface{ Scan(...any) error }) (*User, error) {
 	var u User
-	var loc, last sql.NullInt64
-	err := sc.Scan(&u.ID, &u.Username, &u.Email, &u.DisplayName, &u.Role, &u.Disabled, &u.QuotaBytes, &u.UsedBytes, &loc, &u.RootID, &u.CreatedAt, &u.UpdatedAt, &last, &u.PasswordHash)
+	var loc, last, origin sql.NullInt64
+	err := sc.Scan(&u.ID, &u.Username, &u.Email, &u.DisplayName, &u.Role, &u.Disabled, &u.QuotaBytes, &u.UsedBytes, &loc, &u.RootID, &u.CreatedAt, &u.UpdatedAt, &last, &u.PasswordHash, &origin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -43,6 +45,7 @@ func scanUser(sc interface{ Scan(...any) error }) (*User, error) {
 	}
 	u.LocationID = nullInt(loc)
 	u.LastLoginAt = nullInt(last)
+	u.UploadOrigin = nullInt(origin)
 	return &u, nil
 }
 

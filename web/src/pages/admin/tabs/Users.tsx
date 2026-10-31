@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { KeyRound, MoreHorizontal, RefreshCw, Settings, Shield, ShieldOff, Trash2, UserPlus } from 'lucide-react'
-import { del, errorMessage, get, patch, post } from '../../../lib/api'
+import { del, errorMessage, get, patch, post, put } from '../../../lib/api'
 import { useUser } from '../../../lib/auth'
 import { formatBytes, timeAgo } from '../../../lib/format'
 import { Badge, Button, cx, ErrorState, Field, IconButton, Menu, Modal, PageLoader, ProgressBar, useUI } from '../../../components/ui'
@@ -13,6 +13,8 @@ export default function UsersTab() {
   const { toast, confirm } = useUI()
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['admin-users'], queryFn: () => get('/admin/users') })
   const locs = useQuery({ queryKey: ['admin-storage'], queryFn: () => get('/admin/storage') })
+  const nodes = useQuery({ queryKey: ['admin-nodes'], queryFn: () => get('/admin/nodes') })
+  const remoteNodes: any[] = (nodes.data?.items ?? []).filter((n: any) => n.state === 'approved')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [resetting, setResetting] = useState<any>(null)
@@ -37,7 +39,23 @@ export default function UsersTab() {
 
   if (isLoading) return <PageLoader />
   if (error) return <ErrorState error={error} onRetry={refetch} />
-  const locName = (id: number) => locs.data?.locations.find((l: any) => l.id === id)?.name ?? '-'
+  const locName = (u: any) =>
+    u.upload_origin_node_id
+      ? `${remoteNodes.find((n) => n.id === u.upload_origin_node_id)?.name ?? 'Remote node'} (remote)`
+      : (locs.data?.locations.find((l: any) => l.id === u.location_id)?.name ?? '-')
+
+  // Saves the edit form; a change of remote node goes through its own endpoint
+  // and moves the user's existing files there.
+  const saveEdit = async () => {
+    const { origin, ...fields } = form
+    await patch(`/admin/users/${editing.id}`, fields)
+    if ((origin ?? null) !== (editing.upload_origin_node_id ?? null)) {
+      await put(`/admin/users/${editing.id}/upload-origin`, { node_id: origin ?? null })
+      if (origin) {
+        await post(`/admin/users/${editing.id}/move-to-node`, {}).catch((e) => toast('warning', 'Files will move on the next cycle', errorMessage(e)))
+      }
+    }
+  }
 
   return (
     <div>
@@ -86,7 +104,7 @@ export default function UsersTab() {
                   </div>
                   {u.quota_bytes > 0 && <ProgressBar value={(u.used_bytes / u.quota_bytes) * 100} className="mt-1 h-1.5" tone={u.used_bytes / u.quota_bytes > 0.9 ? 'red' : 'brand'} />}
                 </td>
-                <td className="hidden px-4 py-3 text-xs text-slate-500 lg:table-cell">{locName(u.location_id)}</td>
+                <td className="hidden px-4 py-3 text-xs text-slate-500 lg:table-cell">{locName(u)}</td>
                 <td className="hidden px-4 py-3 text-xs text-slate-500 md:table-cell">{timeAgo(u.last_login_at)}</td>
                 <td className="px-4 py-3 text-right">
                   <Menu
@@ -96,7 +114,7 @@ export default function UsersTab() {
                       </IconButton>
                     )}
                     items={[
-                      { label: 'Edit user, quota & storage', icon: <Settings className="size-4" />, onClick: () => (setForm({ email: u.email, display_name: u.display_name, role: u.role, quota_bytes: u.quota_bytes, location_id: u.location_id }), setEditing(u)) },
+                      { label: 'Edit user, quota & storage', icon: <Settings className="size-4" />, onClick: () => (setForm({ email: u.email, display_name: u.display_name, role: u.role, quota_bytes: u.quota_bytes, location_id: u.location_id, origin: u.upload_origin_node_id ?? null }), setEditing(u)) },
                       { label: 'Reset password', icon: <KeyRound className="size-4" />, onClick: () => (setForm({ password: '' }), setResetting(u)) },
                       { label: 'Sign out all sessions', icon: <ShieldOff className="size-4" />, onClick: () => act(() => post(`/admin/users/${u.id}/revoke-sessions`), 'Sessions revoked') },
                       { label: 'Recalculate usage', icon: <RefreshCw className="size-4" />, onClick: () => act(() => post(`/admin/users/${u.id}/recalculate`), 'Usage recalculated') },
@@ -165,7 +183,7 @@ export default function UsersTab() {
         footer={
           <>
             <Button onClick={() => setEditing(null)}>Cancel</Button>
-            <Button variant="primary" loading={busy} onClick={async () => (await act(() => patch(`/admin/users/${editing.id}`, form), 'User updated')) && setEditing(null)}>
+            <Button variant="primary" loading={busy} onClick={async () => (await act(saveEdit, 'User updated')) && setEditing(null)}>
               Save changes
             </Button>
           </>
@@ -190,13 +208,40 @@ export default function UsersTab() {
             <Field label="Storage quota" hint={`Currently using ${formatBytes(editing.used_bytes)}. Lowering the quota below usage blocks new uploads but keeps existing files.`}>
               <QuotaInput value={form.quota_bytes ?? 0} onChange={(v) => setForm((f: any) => ({ ...f, quota_bytes: v }))} />
             </Field>
-            <Field label="Storage location for new uploads" hint="Existing files stay where they are.">
-              <select className="input" value={form.location_id ?? ''} onChange={(e) => setForm({ ...form, location_id: Number(e.target.value) })}>
-                {(locs.data?.locations ?? []).map((l: any) => (
-                  <option key={l.id} value={l.id} disabled={!l.enabled}>
-                    {l.name} ({l.path})
-                  </option>
-                ))}
+            <Field
+              label="Where this user's files are kept"
+              hint={
+                form.origin
+                  ? 'Existing and new files move to the remote node (checked there, then removed here). Playback streams through this server.'
+                  : editing.upload_origin_node_id
+                    ? 'New uploads stay on this server. Files already on the remote node stay there and keep working.'
+                    : 'Applies to new uploads; existing files stay where they are.'
+              }
+            >
+              <select
+                className="input"
+                value={form.origin ? `node:${form.origin}` : `loc:${form.location_id ?? ''}`}
+                onChange={(e) => {
+                  const [kind, id] = e.target.value.split(':')
+                  setForm(kind === 'node' ? { ...form, origin: Number(id) } : { ...form, origin: null, location_id: Number(id) })
+                }}
+              >
+                <optgroup label="This server">
+                  {(locs.data?.locations ?? []).map((l: any) => (
+                    <option key={l.id} value={`loc:${l.id}`} disabled={!l.enabled}>
+                      {l.name} ({l.path})
+                    </option>
+                  ))}
+                </optgroup>
+                {remoteNodes.length > 0 && (
+                  <optgroup label="Remote nodes">
+                    {remoteNodes.map((n) => (
+                      <option key={n.id} value={`node:${n.id}`}>
+                        {n.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </Field>
           </div>
