@@ -87,17 +87,9 @@ func (s *Server) mediaCommitted(userID int64, n *store.Node) {
 }
 
 // openBlob opens a user's stored content.
-func (s *Server) openBlob(ctx context.Context, userID int64, sha string) (*os.File, error) {
-	loc, err := s.st.BlobLocation(ctx, userID, sha)
-	if err != nil {
-		return nil, err
-	}
-	return s.blobs.Open(loc, userID, sha)
-}
-
 // mediaInfo returns the stream information of stored content, probing it
 // (once, however many ask at the same time) when it is not cached.
-func (s *Server) mediaInfo(ctx context.Context, userID int64, sha string, f *os.File) (*media.Info, error) {
+func (s *Server) mediaInfo(ctx context.Context, userID int64, sha string, f storedFile) (*media.Info, error) {
 	m := s.media
 	if i, ok := m.cache.Info(userID, sha); ok {
 		return i, nil
@@ -135,7 +127,9 @@ func (s *Server) mediaInfo(ctx context.Context, userID int64, sha string, f *os.
 		}
 		defer f.Close()
 	}
-	info, err := m.tools.Probe(ctx, f)
+	in, release := f.Media()
+	defer release()
+	info, err := m.tools.Probe(ctx, in)
 	if err != nil {
 		if ctx.Err() == nil {
 			m.cache.PutFailed(userID, sha, err.Error())
@@ -165,9 +159,11 @@ func (s *Server) makeThumb(ctx context.Context, j thumbJob) {
 	if err != nil {
 		return
 	}
-	img, err := m.tools.Frame(ctx, f, media.PosterTime(info.Duration), 360, 4)
+	in, release := f.Media()
+	defer release()
+	img, err := m.tools.Frame(ctx, in, media.PosterTime(info.Duration), 360, 4)
 	if err != nil && ctx.Err() == nil {
-		img, err = m.tools.Frame(ctx, f, 0, 360, 4)
+		img, err = m.tools.Frame(ctx, in, 0, 360, 4)
 	}
 	if err != nil {
 		if ctx.Err() == nil {
@@ -397,7 +393,9 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
-	img, err := s.media.tools.Frame(r.Context(), f, float64(ms)/1000, h, 6)
+	in, release := f.Media()
+	defer release()
+	img, err := s.media.tools.Frame(r.Context(), in, float64(ms)/1000, h, 6)
 	if err != nil {
 		if r.Context().Err() == nil {
 			writeErr(w, r, errf(422, "no_frame", "%s", err.Error()))

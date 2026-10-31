@@ -448,15 +448,15 @@ func (s *Server) handleDiagSmartBenchmark(w http.ResponseWriter, r *http.Request
 		out[name] = res
 		return err == nil
 	}
-	var f *os.File
+	var f storedFile
 	if !step("open", func() error { f, err = s.openBlob(ctx, it.UserID, it.SHA256); return err }) {
 		writeJSON(w, 200, out)
 		return
 	}
 	defer f.Close()
-	if fi, err := f.Stat(); err == nil {
-		out["file_size"] = fi.Size()
-	}
+	out["file_size"] = f.Size()
+	in, release := f.Media()
+	defer release()
 	step("read_file", func() error {
 		buf := make([]byte, 4<<20)
 		t := time.Now()
@@ -468,7 +468,7 @@ func (s *Server) handleDiagSmartBenchmark(w http.ResponseWriter, r *http.Request
 		return err
 	})
 	step("probe", func() error {
-		info, err := s.media.tools.Probe(ctx, f)
+		info, err := s.media.tools.Probe(ctx, in)
 		if info != nil {
 			out["media"] = info
 		}
@@ -478,14 +478,14 @@ func (s *Server) handleDiagSmartBenchmark(w http.ResponseWriter, r *http.Request
 	var samples int64
 	step("decode_audio", func() error {
 		cw := &countWriter{}
-		err := smart.DecodeAudio(ctx, s.media.tools, f, media.RunOptions{Threads: set.Threads, HWAccel: set.HWAccel, Nice: set.Nice}, cw)
+		err := smart.DecodeAudio(ctx, s.media.tools, in, media.RunOptions{Threads: set.Threads, HWAccel: set.HWAccel, Nice: set.Nice}, cw)
 		samples = cw.n / 2
 		return err
 	})
 	out["audio_seconds"] = float64(samples) / smart.SampleRate
 	step("decode_audio_normal_priority", func() error {
 		cw := &countWriter{}
-		return smart.DecodeAudio(ctx, s.media.tools, f, media.RunOptions{Threads: set.Threads}, cw)
+		return smart.DecodeAudio(ctx, s.media.tools, in, media.RunOptions{Threads: set.Threads}, cw)
 	})
 	writeJSON(w, 200, out)
 }

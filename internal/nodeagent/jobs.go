@@ -113,6 +113,9 @@ func (a *Agent) copyPath(p nodeapi.JobPayload) (string, error) {
 	if !nodeapi.ValidSHA256(p.SHA256) || p.UserID <= 0 {
 		return "", errors.New("invalid copy name")
 	}
+	if p.Kind == nodeapi.KindRemote {
+		return filepath.Join(root, filepath.FromSlash(nodeapi.RemoteFileName(p.UserID, p.SHA256))), nil
+	}
 	return filepath.Join(root, filepath.FromSlash(nodeapi.CopyFileName(p.UserID, p.SHA256))), nil
 }
 

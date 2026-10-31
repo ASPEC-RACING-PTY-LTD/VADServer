@@ -390,6 +390,7 @@ func (s *Store) DuePrimaryChecks(ctx context.Context, before int64, limit int) (
 		JOIN blobs b ON b.user_id = c.user_id AND b.sha256 = c.sha256
 		LEFT JOIN blob_checks k ON k.user_id = b.user_id AND k.sha256 = b.sha256
 		WHERE c.state = 'ok' AND COALESCE(k.verified_at, 0) < ?
+		AND NOT EXISTS (SELECT 1 FROM remote_blobs r WHERE r.user_id = b.user_id AND r.sha256 = b.sha256 AND r.state = 'ok')
 		ORDER BY COALESCE(k.verified_at, 0) LIMIT ?`, before, limit)
 	if err != nil {
 		return nil, err

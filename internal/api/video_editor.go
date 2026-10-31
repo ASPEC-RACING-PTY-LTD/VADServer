@@ -564,6 +564,8 @@ func (s *Server) runExport(ctx context.Context, id, userID int64, req exportReq,
 		return
 	}
 	defer f.Close()
+	srcIn, releaseIn := f.Media()
+	defer releaseIn()
 	folderPath, err := s.st.NodePath(ctx, userID, req.FolderID)
 	if err != nil {
 		fail("The destination folder no longer exists")
@@ -591,7 +593,7 @@ func (s *Server) runExport(ctx context.Context, id, userID int64, req exportReq,
 		j.mu.Unlock()
 		j.clip(i, func(c *exportClipState) { c.State = "running" })
 		j.save(true)
-		node, size, err := s.exportClip(ctx, j, i, user, f, info, src, &c, cs, dirSegs, loc)
+		node, size, err := s.exportClip(ctx, j, i, user, srcIn, info, src, &c, cs, dirSegs, loc)
 		if err != nil {
 			if ctx.Err() != nil {
 				j.clip(i, func(c *exportClipState) { c.State, c.Error = "cancelled", "" })
@@ -661,7 +663,7 @@ func (s *Server) locationFor(ctx context.Context, u *store.User) (int64, error) 
 }
 
 // exportClip makes, checks and stores one clip.
-func (s *Server) exportClip(ctx context.Context, j *exportJob, i int, user *store.User, in *os.File, info *media.Info, src *store.Node, c *media.Clip, cs exportClipState, dirSegs []string, loc int64) (*store.Node, int64, error) {
+func (s *Server) exportClip(ctx context.Context, j *exportJob, i int, user *store.User, in media.Input, info *media.Info, src *store.Node, c *media.Clip, cs exportClipState, dirSegs []string, loc int64) (*store.Node, int64, error) {
 	if fresh, err := s.st.UserByID(ctx, user.ID); err == nil && fresh.QuotaBytes > 0 && fresh.UsedBytes+cs.Estimate > fresh.QuotaBytes {
 		return nil, 0, store.ErrQuota
 	}

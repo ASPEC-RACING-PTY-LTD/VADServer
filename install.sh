@@ -10,7 +10,9 @@
 #   ./install.sh integrations [cloudflared]   # detect and wire up a Cloudflare Tunnel
 #   ./install.sh integrations smart [on|off]  # local AI worker for smart video processing
 #   ./install.sh kek-status      # where the server key file is and whether it exists
-#   ./install.sh install-node    # storage node agent only (systemd), into ./vad-node
+#   ./install.sh install-node    # storage node agent only (systemd), into ./vad-node;
+#                                # installs its dependencies; a pairing secret from the
+#                                # server (Storage > Nodes > Pair a remote node) approves it
 #   ./install.sh uninstall-node
 #   --approve-env-removal NAME[,NAME]  approve removing obsolete .env settings
 #
@@ -84,6 +86,13 @@ ask() { # ask VAR "question" "default"
 	if [ "$YES" = 1 ] || ! have_tty; then printf -v "$__var" '%s' "$def"; return; fi
 	read -r -p "$q${def:+ [$def]}: " ans <"$TTY" || true
 	printf -v "$__var" '%s' "${ans:-$def}"
+}
+ask_secret() { # ask_secret VAR "question": hidden input, never echoed or logged
+	local __var=$1 q=$2 ans=
+	if [ "$YES" = 1 ] || ! have_tty; then printf -v "$__var" '%s' ""; return; fi
+	read -r -s -p "$q: " ans <"$TTY" || true
+	printf '\n' >&2
+	printf -v "$__var" '%s' "$ans"
 }
 confirm() { # confirm "question" default(y/n)
 	local def=${2:-n} ans
@@ -1937,9 +1946,9 @@ node_download() {
 
 do_install_node() {
 	[ "$(id -u)" = 0 ] || die "Installing a node needs root (it creates a systemd service). Run it again with sudo or as root."
+	[ "$(uname -s)" = Linux ] || die "Storage nodes run on Linux."
 	command -v systemctl >/dev/null 2>&1 || die "systemd (systemctl) is required for the node service."
-	command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || die "curl or wget is required."
-	command -v sha256sum >/dev/null 2>&1 || die "sha256sum is required."
+	node_prereqs
 	local ndir; ndir=$(node_dir)
 	case "$ndir" in *[[:space:]]*) die "The node folder must not contain spaces: $ndir (set VAD_NODE_DIR)." ;; esac
 	printf '\n%sInstall a VaultDock storage node%s\n  Folder: %s\n  Only the node agent is installed here (no server files, no Docker).\n\n' "$B" "$N" "$ndir"
@@ -1963,12 +1972,31 @@ do_install_node() {
 		ask url "Server URL (the VaultDock server this node joins, e.g. https://app.vaultdock.dev)" "$url"
 		url=${url%/}
 		[ -n "$url" ] || { warn "Enter the server's address."; [ "$YES" = 1 ] && die "VAD_NODE_SERVER_URL is required."; continue; }
-		case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
+		case "$url" in https://*) ;; http://*)
+			if [ "${VAD_NODE_ALLOW_HTTP:-0}" != 1 ]; then
+				warn "Use the server's https:// address (set VAD_NODE_ALLOW_HTTP=1 only for a server on this local network)."
+				[ "$YES" = 1 ] && die "VAD_NODE_SERVER_URL must be an https:// URL."
+				url=""; continue
+			fi ;;
+		*) url="https://$url" ;; esac
 		if http_get "$url/api/v1/info" 2>/dev/null | grep -q '"name"[[:space:]]*:[[:space:]]*"VaultDock"'; then break; fi
 		warn "$url does not answer as a VaultDock server."
 		[ "$YES" = 1 ] && die "Cannot reach the server at $url."
 	done
 	ok "Server found: $url"
+
+	# Pairing secret (optional): created by the server's administrator under
+	# Storage > Nodes > Pair a remote node; approves this node straight away.
+	local pairing=${VAD_NODE_PAIRING:-}
+	if [ -z "$pairing" ]; then
+		printf '  If the server'"'"'s administrator gave you a pairing secret, enter it now (input is hidden).
+  Leave it empty to ask for approval instead.
+'
+		ask_secret pairing "Pairing secret"
+	fi
+	pairing=$(printf '%s' "$pairing" | tr -d '[:space:]')
+	case "$pairing" in ""|vdp_*) ;; *) die "That is not a pairing secret (they start with vdp_)." ;; esac
+	[ -n "$pairing" ] && ok "Pairing secret received."
 
 	# 2. Name
 	ask name "Your name for this node (shown to the admin who approves it)" "${VAD_NODE_NAME:-$(hostname)}"
@@ -1995,8 +2023,16 @@ do_install_node() {
 	case "$choice" in 2) proxy=cloudflared ;; 3) proxy=nginx ;; 4) proxy=caddy ;; 5) proxy=other ;; *) proxy=none ;; esac
 	ip=$(node_ip)
 	if [ "$proxy" != none ]; then
-		ask public "Public URL of this node through $proxy (point it at http://${ip:-this-machine}:$port; empty if not set up yet)" "${VAD_NODE_PUBLIC_URL:-}"
-		public=${public%/}
+		while :; do
+			ask public "Public https:// address of this node through $proxy (point it at http://${ip:-this-machine}:$port; empty if not set up yet)" "${VAD_NODE_PUBLIC_URL:-}"
+			public=${public%/}
+			case "$public" in ""|https://*) break ;; esac
+			warn "The address must start with https://"
+			[ "$YES" = 1 ] && die "VAD_NODE_PUBLIC_URL must be an https:// URL."
+		done
+	fi
+	if [ -n "$pairing" ] && [ -z "$public" ]; then
+		warn "Without a public https:// address the server can keep copies here, but cannot keep users' files here."
 	fi
 	listen="0.0.0.0:$port"
 
@@ -2019,6 +2055,10 @@ do_install_node() {
 	mkdir -p -- "$ndir/bin" "$ndir/data"
 	chmod 700 -- "$ndir/data"
 	node_fetch_agent "$url" "$ndir"
+	if [ -n "$pairing" ]; then
+		# Read once by the agent with its join request, then deleted.
+		(umask 077; printf '%s\n' "$pairing" >"$ndir/data/pairing")
+	fi
 
 	# 6. .env
 	umask 077
@@ -2052,6 +2092,27 @@ EOF
 
 	# 8. Join request and approval
 	node_wait "$ndir" "$url"
+}
+
+# node_prereqs installs what the node needs (curl, CA certificates,
+# sha256sum) with the system's package manager when they are missing.
+node_prereqs() {
+	local missing=()
+	command -v curl >/dev/null 2>&1 || missing+=(curl)
+	[ -e /etc/ssl/certs/ca-certificates.crt ] || [ -e /etc/pki/tls/certs/ca-bundle.crt ] || [ -e /etc/ssl/cert.pem ] || missing+=(ca-certificates)
+	command -v sha256sum >/dev/null 2>&1 || missing+=(coreutils)
+	[ "${#missing[@]}" = 0 ] && return 0
+	info "Installing what the node needs: ${missing[*]}"
+	if command -v apt-get >/dev/null 2>&1; then
+		DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" >/dev/null
+	elif command -v dnf >/dev/null 2>&1; then dnf install -y -q "${missing[@]}" >/dev/null
+	elif command -v yum >/dev/null 2>&1; then yum install -y -q "${missing[@]}" >/dev/null
+	elif command -v apk >/dev/null 2>&1; then apk add --no-cache -q "${missing[@]}" >/dev/null
+	elif command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm --needed "${missing[@]}" >/dev/null
+	elif command -v zypper >/dev/null 2>&1; then zypper -q -n install "${missing[@]}" >/dev/null
+	else die "Install ${missing[*]} and run this again (no supported package manager found)."; fi || die "Installing ${missing[*]} failed."
+	command -v curl >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 || die "curl and sha256sum are still missing."
+	ok "Installed ${missing[*]}"
 }
 
 # node_write_unit DIR: writes the systemd unit from DIR/.env. Without terminal
@@ -2117,7 +2178,9 @@ node_wait() {
 		case "$rc:$out" in
 		0:*) ok "Approved. This node is connected to $url."; printf '  Status: %s/bin/vad-node status    Logs: journalctl -u %s -f\n' "$ndir" "$NODE_SERVICE"; return ;;
 		2:pending*)
-			if [ "$shown" = 0 ]; then
+			if [ "$shown" = 0 ] && [ -f "$ndir/data/pairing" ]; then
+				info "Pairing with $url..."
+			elif [ "$shown" = 0 ]; then
 				info "Join request sent. An admin must approve it in ${B}$url/admin/nodes${N} within 1 hour"
 				printf '  It shows this node as "%s" from %s, requested %s.\n  Waiting (Ctrl+C stops waiting; the service keeps waiting in the background)...\n' \
 					"$(grep -E '^VAD_NODE_NAME=' "$ndir/.env" | cut -d= -f2-)" "$(grep -E '^VAD_NODE_IP=' "$ndir/.env" | cut -d= -f2-)" "$(date '+%Y-%m-%d %H:%M')"

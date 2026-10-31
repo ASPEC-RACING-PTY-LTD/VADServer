@@ -34,12 +34,15 @@ var newTables = []string{
 	"api_keys",
 	// 17
 	"shares",
+	// 18
+	"node_pairings", "remote_blobs",
 }
 
 // newColumns lists columns added to pre-existing tables.
 var newColumns = map[string][]string{
 	"devices":       {"can_delete"},
-	"users":         {"is_superuser", "backup_quota_bytes", "failures_dismissed_id"},
+	"users":         {"is_superuser", "backup_quota_bytes", "failures_dismissed_id", "upload_origin_node_id"},
+	"storage_nodes": {"paired", "origin_key_id", "origin_public_key", "origin_private_key"},
 	"nodes":         {"revision", "trash_expires_at", "file_created_at"},
 	"uploads":       {"folder_id", "base_revision", "base_sha256", "previous_path", "file_created_at"},
 	"automations":   {"schema_version", "runtime"},
@@ -64,8 +67,8 @@ func assertSchema(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != 17 || LatestSchemaVersion() != 17 {
-		t.Fatalf("schema version = %d, latest = %d, want 17", v, LatestSchemaVersion())
+	if v != 18 || LatestSchemaVersion() != 18 {
+		t.Fatalf("schema version = %d, latest = %d, want 18", v, LatestSchemaVersion())
 	}
 	for _, tbl := range newTables {
 		var n int

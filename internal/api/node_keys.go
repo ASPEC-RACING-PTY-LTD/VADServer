@@ -84,6 +84,20 @@ func nodeKeyAAD(nodeID int64) []byte {
 }
 
 func (s *Server) sealNodeKey(nodeID int64, key []byte) (string, error) {
+	return s.sealNodeSecret(nodeKeyAAD(nodeID), key)
+}
+
+func (s *Server) openNodeKey(nodeID int64, sealed string) ([]byte, error) {
+	key, err := s.openNodeSecret(nodeKeyAAD(nodeID), sealed)
+	if err != nil {
+		return nil, fmt.Errorf("the node's copy key cannot be opened (was %s replaced?)", s.nodeKeyPath())
+	}
+	return key, nil
+}
+
+// sealNodeSecret seals node key material with the node key file; aad names
+// what it is (a copy key, an origin private key) and which node it belongs to.
+func (s *Server) sealNodeSecret(aad, secret []byte) (string, error) {
 	fk, err := s.nodeFileKey()
 	if err != nil {
 		return "", err
@@ -94,10 +108,10 @@ func (s *Server) sealNodeKey(nodeID int64, key []byte) (string, error) {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
-	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, key, nodeKeyAAD(nodeID))), nil
+	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, secret, aad)), nil
 }
 
-func (s *Server) openNodeKey(nodeID int64, sealed string) ([]byte, error) {
+func (s *Server) openNodeSecret(aad []byte, sealed string) ([]byte, error) {
 	fk, err := s.nodeFileKey()
 	if err != nil {
 		return nil, err
@@ -106,13 +120,9 @@ func (s *Server) openNodeKey(nodeID int64, sealed string) ([]byte, error) {
 	block, _ := aes.NewCipher(fk)
 	gcm, _ := cipher.NewGCM(block)
 	if err != nil || len(raw) < gcm.NonceSize()+gcm.Overhead() {
-		return nil, errors.New("the node's copy key is damaged")
+		return nil, errors.New("sealed node key material is damaged")
 	}
-	key, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nodeKeyAAD(nodeID))
-	if err != nil {
-		return nil, fmt.Errorf("the node's copy key cannot be opened (was %s replaced?)", s.nodeKeyPath())
-	}
-	return key, nil
+	return gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], aad)
 }
 
 // nodeCopyKey returns the copy key of a node, creating it if the node has

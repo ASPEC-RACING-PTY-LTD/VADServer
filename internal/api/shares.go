@@ -311,6 +311,10 @@ func (s *Server) handlePublicShareVideo(w http.ResponseWriter, r *http.Request) 
 	hd.Set("Cache-Control", "private, max-age=0, must-revalidate")
 	hd.Set("ETag", `"`+n.SHA256+`"`)
 	hd.Set("X-Robots-Tag", "noindex")
+	if err := precheck(r, f); err != nil {
+		writeErr(w, r, contentError(err))
+		return
+	}
 	http.ServeContent(w, r, name, time.UnixMilli(n.ModifiedAt), f)
 }
 

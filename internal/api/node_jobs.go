@@ -173,28 +173,45 @@ func (s *Server) handleNodeJobDataGet(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(409, "not_put", "This job has no data to download"))
 		return
 	}
-	key, err := s.nodeCopyKey(r.Context(), n.ID)
-	if err != nil {
-		writeErr(w, r, errf(503, "no_key", "%s", err.Error()))
-		return
-	}
-	_, loc, err := s.st.BlobRow(r.Context(), meta.UserID, meta.SHA256)
+	size, _, err := s.st.BlobRow(r.Context(), meta.UserID, meta.SHA256)
 	if err != nil {
 		writeErr(w, r, errf(404, "gone", "The file is no longer stored"))
 		return
 	}
-	f, err := s.blobs.Open(loc, meta.UserID, meta.SHA256)
+	f, err := s.openBlob(r.Context(), meta.UserID, meta.SHA256)
 	if err != nil {
 		writeErr(w, r, errf(404, "gone", "The stored file cannot be read: %v", err))
 		return
 	}
 	defer f.Close()
+	// Copies are encrypted with the node's copy key; files moved to the node
+	// (remote) for its key pair, which only this server can open.
+	encrypt := func(dst io.Writer, src io.Reader) error { return errors.New("no key") }
+	if meta.Purpose == nodeapi.KindRemote {
+		ok, err := s.nodeOriginKey(r.Context(), n.ID)
+		if err != nil {
+			writeErr(w, r, errf(503, "no_key", "%s", err.Error()))
+			return
+		}
+		encrypt = func(dst io.Writer, src io.Reader) error {
+			return replica.EncryptV2(dst, src, size, ok.priv.PublicKey(), replica.BlobID(meta.UserID, meta.SHA256))
+		}
+	} else {
+		key, err := s.nodeCopyKey(r.Context(), n.ID)
+		if err != nil {
+			writeErr(w, r, errf(503, "no_key", "%s", err.Error()))
+			return
+		}
+		encrypt = func(dst io.Writer, src io.Reader) error {
+			return replica.Encrypt(dst, src, key, replica.BlobID(meta.UserID, meta.SHA256))
+		}
+	}
 	st := s.jobHub().state(j.ID)
 	plain, enc := sha256.New(), sha256.New()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(200)
-	if err := replica.Encrypt(io.MultiWriter(w, enc), io.TeeReader(f, plain), key, replica.BlobID(meta.UserID, meta.SHA256)); err != nil {
+	if err := encrypt(io.MultiWriter(w, enc), io.TeeReader(f, plain)); err != nil {
 		return
 	}
 	s.jobHub().mu.Lock()
@@ -286,6 +303,19 @@ func (s *Server) applyJobResult(ctx context.Context, j *store.NodeJob, meta jobM
 		}
 		_ = s.st.SetNodeLocationStatus(ctx, meta.LocationID, status, msg, res.DiskTotal, res.DiskFree)
 	case nodeapi.JobPut:
+		if meta.Purpose == nodeapi.KindRemote {
+			hub.mu.Lock()
+			enc, plain := st.encSHA, st.plainSHA
+			hub.mu.Unlock()
+			err := s.remoteMoved(ctx, meta, res, enc, plain)
+			if err != nil {
+				_ = s.st.FailRemoteBlob(ctx, meta.UserID, meta.SHA256, err.Error())
+			}
+			hub.mu.Lock()
+			st.restored = err
+			hub.mu.Unlock()
+			return
+		}
 		c, err := s.st.BlobCopy(ctx, meta.UserID, meta.SHA256, meta.Target)
 		if err != nil {
 			// Nobody tracks this copy any more (deleted while it was being
@@ -320,6 +350,10 @@ func (s *Server) applyJobResult(ctx context.Context, j *store.NodeJob, meta jobM
 			_ = s.st.SetCopy(ctx, c)
 		}
 	case nodeapi.JobVerify:
+		if meta.Purpose == nodeapi.KindRemote {
+			s.remoteVerified(ctx, meta, res)
+			return
+		}
 		c, err := s.st.BlobCopy(ctx, meta.UserID, meta.SHA256, meta.Target)
 		if err != nil || c.State != "ok" {
 			return
@@ -334,6 +368,14 @@ func (s *Server) applyJobResult(ctx context.Context, j *store.NodeJob, meta jobM
 		}
 		_ = s.st.SetCopy(ctx, c)
 	case nodeapi.JobDelete:
+		if meta.Purpose == nodeapi.KindRemote {
+			if res.OK {
+				_ = s.st.DeleteRemoteBlob(ctx, meta.UserID, meta.SHA256)
+			} else {
+				_ = s.st.SetRemoteBlobState(ctx, meta.UserID, meta.SHA256, "deleting", "delete failed: "+res.Error)
+			}
+			return
+		}
 		if res.OK {
 			_ = s.st.DeleteCopyRow(ctx, meta.UserID, meta.SHA256, meta.Target)
 		} else if c, err := s.st.BlobCopy(ctx, meta.UserID, meta.SHA256, meta.Target); err == nil {

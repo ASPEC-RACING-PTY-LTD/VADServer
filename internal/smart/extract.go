@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	"github.com/ASPEC-RACING-PTY-LTD/vad-server/internal/media"
@@ -19,7 +18,7 @@ import (
 func secs(v float64) string { return strconv.FormatFloat(v, 'f', 3, 64) }
 
 // DecodeAudio writes the first audio track as 16 kHz mono s16le to w.
-func DecodeAudio(ctx context.Context, t media.Tools, in *os.File, o media.RunOptions, w io.Writer) error {
+func DecodeAudio(ctx context.Context, t media.Tools, in media.Input, o media.RunOptions, w io.Writer) error {
 	args := []string{"-i", "{input}", "-map", "0:a:0", "-vn", "-sn", "-dn", "-ac", "1", "-ar", strconv.Itoa(SampleRate), "-f", "s16le", "-c:a", "pcm_s16le", "pipe:1"}
 	return t.Pipe(ctx, in, args, o, func(r io.Reader) error {
 		_, err := io.Copy(w, r)
@@ -34,7 +33,7 @@ const (
 )
 
 // MeasureVideo decodes small gray frames and measures them.
-func MeasureVideo(ctx context.Context, t media.Tools, in *os.File, o media.RunOptions) (*VideoDSP, error) {
+func MeasureVideo(ctx context.Context, t media.Tools, in media.Input, o media.RunOptions) (*VideoDSP, error) {
 	m := &FrameMeter{W: dspW, H: dspH, Rate: dspFrameRate}
 	args := []string{"-i", "{input}", "-map", "0:v:0", "-an", "-sn", "-dn",
 		"-vf", fmt.Sprintf("fps=%d,scale=%d:%d:flags=area,format=gray", dspFrameRate, dspW, dspH), "-f", "rawvideo", "pipe:1"}
@@ -50,7 +49,7 @@ func MeasureVideo(ctx context.Context, t media.Tools, in *os.File, o media.RunOp
 
 // ExtractFrames decodes frames from..to (seconds) at fps, width pixels
 // wide, as JPEG, and hands each to fn with its time.
-func ExtractFrames(ctx context.Context, t media.Tools, in *os.File, o media.RunOptions, from, to, fps float64, width int, fn func(at float64, jpeg []byte) error) error {
+func ExtractFrames(ctx context.Context, t media.Tools, in media.Input, o media.RunOptions, from, to, fps float64, width int, fn func(at float64, jpeg []byte) error) error {
 	args := []string{"-ss", secs(from), "-t", secs(to - from), "-i", "{input}", "-map", "0:v:0", "-an", "-sn", "-dn",
 		"-vf", fmt.Sprintf("fps=%s,scale='min(%d,iw)':-2:flags=bilinear", strconv.FormatFloat(fps, 'f', -1, 64), width),
 		"-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "4", "pipe:1"}

@@ -76,7 +76,9 @@ type Source struct {
 	UserID int64
 	SHA256 string
 	Info   *media.Info
-	Open   func() (*os.File, error)
+	// Open gives FFmpeg the recording (a local file, or content relayed from
+	// a storage node); close releases it.
+	Open func() (in media.Input, close func(), err error)
 }
 
 func (a *Analyzer) settings() Settings {
@@ -233,12 +235,12 @@ func (a *Analyzer) Ensure(ctx context.Context, src Source, detectors []string, p
 	for _, d := range vision {
 		if d == DVideoDSP {
 			progress("motion", 0)
-			f, err := src.Open()
+			f, closeF, err := src.Open()
 			if err != nil {
 				return failed, err
 			}
 			vd, err := MeasureVideo(ctx, a.Tools, f, s.run())
-			f.Close()
+			closeF()
 			if err != nil {
 				if ctx.Err() != nil {
 					return failed, ctx.Err()
@@ -310,7 +312,7 @@ func (a *Analyzer) audio(ctx context.Context, src Source, s Settings, w *Worker,
 	}
 	defer func() { pcm.Close(); os.Remove(pcm.Name()) }()
 	progress("decoding audio", 0)
-	f, err := src.Open()
+	f, closeF, err := src.Open()
 	if err != nil {
 		return err
 	}
@@ -322,7 +324,7 @@ func (a *Analyzer) audio(ctx context.Context, src Source, s Settings, w *Worker,
 	}
 	bw := bufio.NewWriterSize(sink, 1<<20)
 	err = DecodeAudio(ctx, a.Tools, f, s.run(), bw)
-	f.Close()
+	closeF()
 	if err == nil {
 		err = bw.Flush()
 	}
@@ -577,7 +579,7 @@ func (a *Analyzer) frames(ctx context.Context, src Source, s Settings, w *Worker
 		progress("watching", part.Done/total)
 		from := part.Done
 		to := math.Min(from+frameSpan, total)
-		f, err := src.Open()
+		f, closeF, err := src.Open()
 		if err != nil {
 			return err
 		}
@@ -586,7 +588,7 @@ func (a *Analyzer) frames(ctx context.Context, src Source, s Settings, w *Worker
 			batch.Add(at, jpeg)
 			return nil
 		})
-		f.Close()
+		closeF()
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()

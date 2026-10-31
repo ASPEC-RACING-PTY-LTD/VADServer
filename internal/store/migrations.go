@@ -1262,4 +1262,43 @@ CREATE TABLE shares (
 );
 CREATE INDEX shares_user ON shares(user_id, node_id);
 `,
+	// 18: remote storage nodes: pairing secrets, per-node key pairs (the
+	// private key sealed like copy keys, never sent to the node), files whose
+	// content lives only on a node, and users' upload origin.
+	`
+CREATE TABLE node_pairings (
+	id         INTEGER PRIMARY KEY,
+	name       TEXT NOT NULL,
+	code_hash  TEXT NOT NULL UNIQUE,
+	public_url TEXT NOT NULL DEFAULT '',
+	created_by INTEGER,
+	created_at INTEGER NOT NULL,
+	expires_at INTEGER NOT NULL,
+	used_at    INTEGER,
+	node_id    INTEGER
+);
+ALTER TABLE storage_nodes ADD COLUMN paired INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE storage_nodes ADD COLUMN origin_key_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE storage_nodes ADD COLUMN origin_public_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE storage_nodes ADD COLUMN origin_private_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN upload_origin_node_id INTEGER;
+CREATE TABLE remote_blobs (
+	user_id       INTEGER NOT NULL,
+	sha256        TEXT NOT NULL,
+	node_id       INTEGER NOT NULL,
+	location_id   INTEGER NOT NULL,
+	key_id        TEXT NOT NULL,
+	plain_size    INTEGER NOT NULL,
+	cipher_sha256 TEXT NOT NULL DEFAULT '',
+	cipher_size   INTEGER NOT NULL DEFAULT 0,
+	state         TEXT NOT NULL CHECK (state IN ('moving','ok','missing','deleting')),
+	attempts      INTEGER NOT NULL DEFAULT 0,
+	last_error    TEXT NOT NULL DEFAULT '',
+	created_at    INTEGER NOT NULL,
+	updated_at    INTEGER NOT NULL,
+	verified_at   INTEGER,
+	PRIMARY KEY (user_id, sha256)
+);
+CREATE INDEX remote_blobs_node ON remote_blobs(node_id, state);
+`,
 }

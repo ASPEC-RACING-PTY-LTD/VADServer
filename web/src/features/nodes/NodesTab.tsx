@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, FolderPlus, Server, SquareTerminal, X } from 'lucide-react'
+import { Check, Copy, FolderPlus, HardDrive, Server, SquareTerminal, X } from 'lucide-react'
 import { del, errorMessage, get, patch, post } from '../../lib/api'
 import { formatBytes, formatDate, timeAgo } from '../../lib/format'
 import { Badge, Button, EmptyState, ErrorState, Field, PageLoader, Toggle, useUI } from '../../components/ui'
 import { NodeTerminal } from './Terminal'
+import { RemoteNodePanel, RemotePairing } from './RemoteNodes'
 
 interface StorageNode {
   id: number
@@ -43,6 +44,7 @@ export default function NodesTab() {
   const { toast, confirm } = useUI()
   const [busy, setBusy] = useState<string | null>(null)
   const [terminal, setTerminal] = useState<StorageNode | null>(null)
+  const [remote, setRemote] = useState<StorageNode | null>(null)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-nodes'],
     queryFn: () => get<{ items: StorageNode[]; server_version: string }>('/admin/nodes'),
@@ -87,6 +89,8 @@ export default function NodesTab() {
           </Button>
         </div>
       </section>
+
+      <RemotePairing />
 
       {pending.length > 0 && (
         <section className="space-y-3">
@@ -200,6 +204,11 @@ export default function NodesTab() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    {n.state === 'approved' && (
+                      <Button size="sm" variant="ghost" icon={<HardDrive className="size-4" />} onClick={() => setRemote(n)}>
+                        Users&apos; files
+                      </Button>
+                    )}
                     {n.state === 'approved' && n.terminal_enabled && (
                       <Button size="sm" variant="ghost" icon={<SquareTerminal className="size-4" />} onClick={() => setTerminal(n)}>
                         Terminal
@@ -237,6 +246,7 @@ export default function NodesTab() {
 
       <NodeLocations nodes={data.items.filter((n) => n.state === 'approved')} />
       {terminal && <NodeTerminal nodeId={terminal.id} nodeName={terminal.name} onClose={() => setTerminal(null)} />}
+      {remote && <RemoteNodePanel nodeId={remote.id} nodeName={remote.name} onClose={() => setRemote(null)} />}
     </div>
   )
 }

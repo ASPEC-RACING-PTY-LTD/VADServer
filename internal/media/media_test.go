@@ -223,14 +223,14 @@ func TestRealFFmpeg(t *testing.T) {
 	}
 	defer f.Close()
 	ctx := context.Background()
-	info, err := tools.Probe(ctx, f)
+	info, err := tools.Probe(ctx, File(f))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Width != 640 || info.Height != 360 || !info.HasAudio() || info.Duration < 11.5 {
 		t.Fatalf("probe = %+v", info)
 	}
-	img, err := tools.Frame(ctx, f, 5, 72, 6)
+	img, err := tools.Frame(ctx, File(f), 5, 72, 6)
 	if err != nil || len(img) < 100 || img[0] != 0xFF || img[1] != 0xD8 {
 		t.Fatalf("frame: %v (%d bytes)", err, len(img))
 	}
@@ -254,7 +254,7 @@ func TestRealFFmpeg(t *testing.T) {
 			format, _ := Container(mode, "src.mp4", info)
 			out := filepath.Join(dir, tc.name+".part")
 			var last float64
-			if err := tools.Export(ctx, f, ExportArgs(&c, mode, info, format, out), func(s float64) { last = s }); err != nil {
+			if err := tools.Export(ctx, File(f), ExportArgs(&c, mode, info, format, out), func(s float64) { last = s }); err != nil {
 				t.Fatal(err)
 			}
 			want := c.OutputDuration()
@@ -284,7 +284,7 @@ func TestRealFFmpeg(t *testing.T) {
 	_ = os.WriteFile(bad, []byte("not a video at all"), 0o644)
 	bf, _ := os.Open(bad)
 	defer bf.Close()
-	if _, err := tools.Probe(ctx, bf); err == nil {
+	if _, err := tools.Probe(ctx, File(bf)); err == nil {
 		t.Fatal("damaged file probed as a video")
 	}
 }

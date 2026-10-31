@@ -94,6 +94,15 @@ func (s *Server) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.activity(r, 0, "node.join_requested", name, fmt.Sprintf("storage node %q asked to join from %s (reported %s)", name, ip, n.ReportedIP), true)
+	// A pairing secret from Storage > Nodes approves the node straight away;
+	// an unusable one leaves the request for an administrator.
+	if req.Pairing != "" {
+		if err := s.pairNode(r.Context(), n, req.Pairing); err != nil {
+			s.activity(r, 0, "node.pairing_refused", name, "the pairing secret was wrong, used or expired; the request waits for approval", true)
+		} else {
+			s.activity(r, 0, "node.paired", name, fmt.Sprintf("storage node %q paired with a pairing secret", name), true)
+		}
+	}
 	writeJSON(w, 201, nodeapi.JoinResponse{ID: n.ID, PollToken: token, ExpiresAt: n.ExpiresAt, PollInterval: nodePollInterval})
 }
 
@@ -166,6 +175,7 @@ func (s *Server) handleNodeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.syncNodeLocations(r.Context(), n.ID, hb.Locations)
+	s.autoNodeLocation(context.WithoutCancel(r.Context()), n, hb.StorageRoots)
 	// Jobs claimed before the agent (re)started were lost with the old process
 	// (restart, self-update): fail them now so the work is retried at once.
 	if hb.UptimeSeconds >= 0 && hb.UptimeSeconds < 24*3600 {

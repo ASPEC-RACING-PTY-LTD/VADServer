@@ -4,6 +4,10 @@
 package nodeapi
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -24,6 +28,10 @@ type JoinRequest struct {
 	Proxy     string `json:"proxy"` // none, cloudflared, nginx, caddy, other
 	PublicURL string `json:"public_url"`
 	Version   string `json:"version"`
+	// Pairing is a pairing secret from the server's administration
+	// (Storage > Nodes > Pair a remote node): a valid one approves the
+	// node straight away.
+	Pairing string `json:"pairing,omitempty"`
 }
 
 // JoinResponse answers a join request. PollToken authenticates the polls.
@@ -95,10 +103,13 @@ type JobPayload struct {
 	Path       string `json:"path,omitempty"` // prepare: the folder
 	UserID     int64  `json:"user_id,omitempty"`
 	SHA256     string `json:"sha256,omitempty"` // the blob (plaintext hash; names the copy)
-	Size       int64  `json:"size,omitempty"`
-	Session    string `json:"session,omitempty"` // terminal
-	Cols       int    `json:"cols,omitempty"`
-	Rows       int    `json:"rows,omitempty"`
+	// Kind is "remote" for a file held only by the node (stored apart from
+	// copies; see RemoteFileName). Empty for copies.
+	Kind    string `json:"kind,omitempty"`
+	Size    int64  `json:"size,omitempty"`
+	Session string `json:"session,omitempty"` // terminal
+	Cols    int    `json:"cols,omitempty"`
+	Rows    int    `json:"rows,omitempty"`
 }
 
 // JobResult is posted when a job ends (POST /api/v1/node/jobs/{id}/result).
@@ -124,6 +135,37 @@ type TerminalInput struct {
 // <root>/replicas/<user>/<aa>/<bb>/<sha256>.vdr
 func CopyFileName(userID int64, sha string) string {
 	return "replicas/" + strconv.FormatInt(userID, 10) + "/" + sha[0:2] + "/" + sha[2:4] + "/" + sha + ".vdr"
+}
+
+// KindRemote marks jobs on files held only by the node.
+const KindRemote = "remote"
+
+// RemoteFileName is where a node keeps a file it alone holds (encrypted for
+// the server's key for this node), relative to its location folder.
+func RemoteFileName(userID int64, sha string) string {
+	return "remote/" + strconv.FormatInt(userID, 10) + "/" + sha[0:2] + "/" + sha[2:4] + "/" + sha + ".vdr2"
+}
+
+// Remote reads: the server fetches byte ranges of a remote file from the
+// node's public address (GET RemotePath(...), with a Range header). The
+// request is signed with the node secret's SHA-256 (hex), which both sides
+// know; the node refuses unsigned or stale (over ReadSkew old) requests.
+const (
+	HeaderTime = "X-VD-Time"
+	HeaderSig  = "X-VD-Sig"
+	ReadSkew   = 2 * 60 // seconds
+)
+
+// RemotePath is the node URL path of a remote file.
+func RemotePath(locationID, userID int64, sha string) string {
+	return fmt.Sprintf("/v1/remote/%d/%d/%s", locationID, userID, sha)
+}
+
+// SignRead signs a remote read: method, path, Range header and time.
+func SignRead(key []byte, method, path, rng, ts string) string {
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(strings.Join([]string{method, path, rng, ts}, "|")))
+	return hex.EncodeToString(m.Sum(nil))
 }
 
 // ValidSHA256 accepts 64 lower-case hex characters.

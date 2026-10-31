@@ -140,7 +140,9 @@ func (s *Server) clipValid(ctx context.Context, userID int64, o *store.SmartOutp
 		return false
 	}
 	defer f.Close()
-	info, err := s.media.tools.Probe(ctx, f)
+	in, release := f.Media()
+	defer release()
+	info, err := s.media.tools.Probe(ctx, in)
 	if err != nil || info.Duration <= 0 {
 		return false
 	}

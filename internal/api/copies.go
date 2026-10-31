@@ -305,7 +305,7 @@ func (s *Server) makeCopy(ctx context.Context, c *store.BlobCopy, t copyTarget) 
 		return
 	}
 	if t.Kind == "local" {
-		f, err := s.blobs.Open(loc, c.UserID, c.SHA256)
+		f, err := s.openBlob(ctx, c.UserID, c.SHA256)
 		if err != nil {
 			s.copyFailed(ctx, c, "cannot read the original: "+err.Error())
 			return

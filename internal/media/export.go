@@ -378,7 +378,7 @@ func ExportArgs(c *Clip, mode string, info *Info, format, out string) []string {
 }
 
 // Export runs the clip export from in to out (a new file).
-func (t Tools) Export(ctx context.Context, in *os.File, args []string, progress Progress) error {
+func (t Tools) Export(ctx context.Context, in Input, args []string, progress Progress) error {
 	if t.FFmpeg == "" {
 		return ErrUnavailable
 	}
@@ -400,7 +400,7 @@ func (t Tools) Verify(ctx context.Context, file string, want float64, wantAudio 
 		return nil, err
 	}
 	defer f.Close()
-	info, err := t.Probe(ctx, f)
+	info, err := t.Probe(ctx, File(f))
 	if err != nil {
 		return nil, fmt.Errorf("the exported file is not playable: %w", err)
 	}

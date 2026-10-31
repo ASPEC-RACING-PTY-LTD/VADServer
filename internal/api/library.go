@@ -83,15 +83,10 @@ func (s *Server) handleLibraryContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := n.Owner()
-	loc, err := s.st.BlobLocation(r.Context(), uid, n.SHA256)
+	f, err := s.openBlob(r.Context(), uid, n.SHA256)
 	if err != nil {
-		writeErr(w, r, err)
-		return
-	}
-	f, err := s.blobs.Open(loc, uid, n.SHA256)
-	if err != nil {
-		slog.Error("blob missing", "node", n.ID, "err", err)
-		writeErr(w, r, errf(503, "content_unavailable", "File content is unavailable on the storage device"))
+		slog.Error("blob unavailable", "node", n.ID, "err", err)
+		writeErr(w, r, contentError(err))
 		return
 	}
 	defer f.Close()
@@ -113,6 +108,10 @@ func (s *Server) handleLibraryContent(w http.ResponseWriter, r *http.Request) {
 	h.Set("ETag", `"`+n.SHA256+`"`)
 	h.Set("X-Frame-Options", "SAMEORIGIN")
 	s.auditLibrary(r, n, download)
+	if err := precheck(r, f); err != nil {
+		writeErr(w, r, contentError(err))
+		return
+	}
 	http.ServeContent(w, r, n.Name, time.UnixMilli(n.ModifiedAt), f)
 }
 

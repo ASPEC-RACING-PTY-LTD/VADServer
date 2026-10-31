@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ type RunOptions struct {
 // and hands its standard output to read. Analysis uses it to decode audio
 // and frames as raw streams without temp files. When read returns early
 // the process is stopped.
-func (t Tools) Pipe(ctx context.Context, in *os.File, args []string, o RunOptions, read func(io.Reader) error) error {
+func (t Tools) Pipe(ctx context.Context, in Input, args []string, o RunOptions, read func(io.Reader) error) error {
 	if t.FFmpeg == "" {
 		return ErrUnavailable
 	}
@@ -86,7 +85,7 @@ func lowerPriority(cmd *exec.Cmd, nice int) {
 
 // KeyframeAt reports whether the video has a keyframe within tol seconds
 // of at, so a stream copy starting there is frame-accurate.
-func (t Tools) KeyframeAt(ctx context.Context, in *os.File, at, tol float64) (bool, error) {
+func (t Tools) KeyframeAt(ctx context.Context, in Input, at, tol float64) (bool, error) {
 	if t.FFprobe == "" {
 		return false, ErrUnavailable
 	}

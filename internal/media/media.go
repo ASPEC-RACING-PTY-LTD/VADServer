@@ -67,16 +67,37 @@ func (t Tools) Version(ctx context.Context) string {
 	return strings.TrimSpace(line)
 }
 
+// Input is what FFmpeg reads: an open local file (File) or a URL it reads
+// with HTTP range requests (URL; content relayed from a storage node).
+type Input interface {
+	attach(cmd *exec.Cmd) string
+}
+
+type fileInput struct{ f *os.File }
+
+// File reads an open file (passed to the child as a descriptor on Linux, so
+// a path that changes meanwhile does not matter).
+func File(f *os.File) Input { return fileInput{f} }
+
+func (i fileInput) attach(cmd *exec.Cmd) string {
+	if runtime.GOOS == "linux" {
+		cmd.ExtraFiles = []*os.File{i.f}
+		return "/dev/fd/3"
+	}
+	return i.f.Name()
+}
+
+// URL reads content over HTTP (seekable with range requests).
+type URL string
+
+func (u URL) attach(*exec.Cmd) string { return string(u) }
+
 // command builds a child process reading in. The returned input path goes
 // where the command expects the input file.
-func command(ctx context.Context, bin string, in *os.File) (*exec.Cmd, string) {
+func command(ctx context.Context, bin string, in Input) (*exec.Cmd, string) {
 	cmd := exec.CommandContext(ctx, bin)
 	cmd.WaitDelay = 5 * time.Second
-	if runtime.GOOS == "linux" {
-		cmd.ExtraFiles = []*os.File{in}
-		return cmd, "/dev/fd/3"
-	}
-	return cmd, in.Name()
+	return cmd, in.attach(cmd)
 }
 
 // stderrTail keeps the end of a process's error output for messages.
@@ -157,7 +178,7 @@ func rate(s string) float64 {
 }
 
 // Probe reads stream information.
-func (t Tools) Probe(ctx context.Context, in *os.File) (*Info, error) {
+func (t Tools) Probe(ctx context.Context, in Input) (*Info, error) {
 	if t.FFprobe == "" {
 		return nil, ErrUnavailable
 	}
@@ -251,7 +272,7 @@ func seconds(v float64) string { return strconv.FormatFloat(math.Max(0, v), 'f',
 
 // Frame returns one JPEG frame at t seconds, height pixels high (0 keeps
 // the size; width follows the aspect ratio).
-func (t Tools) Frame(ctx context.Context, in *os.File, at float64, height int, quality int) ([]byte, error) {
+func (t Tools) Frame(ctx context.Context, in Input, at float64, height int, quality int) ([]byte, error) {
 	if t.FFmpeg == "" {
 		return nil, ErrUnavailable
 	}

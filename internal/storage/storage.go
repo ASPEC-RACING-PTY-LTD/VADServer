@@ -66,6 +66,16 @@ type Manager struct {
 	GlobalMinFree int64
 	// fallback supplies blobs whose primary file is missing (replicas.go).
 	fallback FallbackFunc
+	// removed is called for each blob Remove deleted (no file uses it any
+	// more), so content held elsewhere (a remote node) is deleted too.
+	removed func(store.BlobRef)
+}
+
+// SetRemoveHook installs the hook called after Remove deletes a blob.
+func (m *Manager) SetRemoveHook(f func(store.BlobRef)) {
+	m.mu.Lock()
+	m.removed = f
+	m.mu.Unlock()
 }
 
 func New(st *store.Store) *Manager {
@@ -510,6 +520,12 @@ func (m *Manager) Remove(ctx context.Context, refs []store.BlobRef) {
 				slog.Warn("failed to delete blob", "path", p, "err", err)
 			}
 			m.removeVariants(r.LocationID, r.UserID, r.SHA256, p)
+			m.mu.Lock()
+			hook := m.removed
+			m.mu.Unlock()
+			if hook != nil {
+				hook(r)
+			}
 		}()
 	}
 }
@@ -725,4 +741,20 @@ func splitPath(p string) []string {
 		p = dir
 	}
 	return out
+}
+
+// RemovePrimary deletes the local file of a blob that stays recorded (its
+// content now lives on a remote storage node).
+func (m *Manager) RemovePrimary(locID, userID int64, sha string) error {
+	unlock := m.lock(userID, sha)
+	defer unlock()
+	p, err := m.BlobPath(locID, userID, sha)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	m.removeVariants(locID, userID, sha, p)
+	return nil
 }

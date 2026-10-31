@@ -54,6 +54,7 @@ type Agent struct {
 	status    Status
 	lastErr   string
 	locations *locations
+	readKey   []byte // signs the server's remote reads (remote.go)
 }
 
 func (a *Agent) current() Status {
@@ -220,7 +221,7 @@ func (a *Agent) join(ctx context.Context) error {
 		var jr nodeapi.JoinResponse
 		if _, err := a.do(ctx, "POST", "/api/v1/node/join", nodeapi.JoinRequest{
 			Name: a.cfg.Name, Hostname: host, IP: a.joinIP(), OS: runtime.GOOS, Arch: runtime.GOARCH,
-			Port: a.cfg.Port, Proxy: a.cfg.Proxy, PublicURL: a.cfg.PublicURL, Version: Version,
+			Port: a.cfg.Port, Proxy: a.cfg.Proxy, PublicURL: a.cfg.PublicURL, Version: Version, Pairing: a.pairingSecret(),
 		}, nil, &jr); err != nil {
 			a.setStatus(Status{State: "error", Message: "Could not reach the server: " + err.Error()})
 			return err
@@ -259,6 +260,7 @@ func (a *Agent) join(ctx context.Context) error {
 				return err
 			}
 			_ = os.Remove(a.joinFile())
+			_ = os.Remove(a.cfg.pairingFile()) // single use; never kept
 			a.log.Info("node approved", "node", js.ID)
 			a.setStatus(Status{State: "approved", NodeID: js.ID, Message: "Approved and connected."})
 			return nil
@@ -300,6 +302,7 @@ func (a *Agent) localIP() string {
 
 func (a *Agent) heartbeats(ctx context.Context, id int64, secret string) error {
 	auth := map[string]string{"Authorization": fmt.Sprintf("%s %d.%s", nodeapi.AuthScheme, id, secret)}
+	a.setReadKey(secret)
 	interval := 30 * time.Second
 	jctx, stopJobs := context.WithCancel(ctx)
 	defer stopJobs()
@@ -420,6 +423,7 @@ func (a *Agent) serveLocal(ctx context.Context) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("ok\n")) })
+	mux.HandleFunc("/v1/remote/", a.serveRemote)
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"name": a.cfg.Name, "state": a.current().State, "version": Version})

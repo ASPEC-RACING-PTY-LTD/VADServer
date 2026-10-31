@@ -325,7 +325,14 @@ func (s *Server) analyseItem(parent context.Context, it *store.SmartItem) {
 			keep = append(keep, d)
 		}
 	}
-	src := smart.Source{UserID: user.ID, SHA256: node.SHA256, Info: info, Open: func() (*os.File, error) { return s.openBlob(ctx, user.ID, node.SHA256) }}
+	src := smart.Source{UserID: user.ID, SHA256: node.SHA256, Info: info, Open: func() (media.Input, func(), error) {
+		f, err := s.openBlob(ctx, user.ID, node.SHA256)
+		if err != nil {
+			return nil, nil, err
+		}
+		in, release := f.Media()
+		return in, func() { release(); f.Close() }, nil
+	}}
 	an := s.smartAnalyzer()
 	last := time.Time{}
 	tMeasure := time.Now()
@@ -571,12 +578,14 @@ func (s *Server) renderOutput(ctx context.Context, user *store.User, src *store.
 		return errf(503, "content_unavailable", "The original's content is unavailable on the storage device")
 	}
 	defer in.Close()
+	mi, release := in.Media()
+	defer release()
 	quality := out.Quality
 	mode := quality
 	if quality == "auto" {
 		mode = media.QualityHigh
 		// A stream copy is exact only when the cut starts on a keyframe.
-		if ok, err := s.media.tools.KeyframeAt(ctx, in, c.Start, 0.5/math.Max(info.FPS, 1)); err == nil && ok {
+		if ok, err := s.media.tools.KeyframeAt(ctx, mi, c.Start, 0.5/math.Max(info.FPS, 1)); err == nil && ok {
 			mode = media.QualityCopy
 		}
 	}
@@ -618,7 +627,7 @@ func (s *Server) renderOutput(ctx context.Context, user *store.User, src *store.
 	}
 	defer storage.RemoveTemp(tmp)
 	args := media.ExportArgs(&c, mode, info, format, tmp)
-	if err := s.media.tools.Export(ctx, in, args, nil); err != nil {
+	if err := s.media.tools.Export(ctx, mi, args, nil); err != nil {
 		return err
 	}
 	want := c.OutputDuration()

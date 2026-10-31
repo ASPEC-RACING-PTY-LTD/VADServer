@@ -798,6 +798,7 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountAPIKeys(rt)
 	s.mountLibrary(rt)
 	s.mountShares(rt)
+	s.mountRemoteNodes(rt)
 }
 
 // Handler builds the HTTP router.

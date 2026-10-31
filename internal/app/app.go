@@ -107,6 +107,7 @@ func (a *App) Run(ctx context.Context) {
 	go a.Blobs.RunExtractSweeper(ctx, time.Minute, storage.ExtractIdle)
 	// File copies (copy rules, storage nodes) and the read fallback.
 	go a.Server.RunCopies(ctx)
+	go a.Server.RunRemote(ctx) // remote storage nodes: moves and checks
 	// Video thumbnails (FFmpeg), and exports a restart interrupted.
 	go a.Server.RunMedia(ctx)
 	go a.Server.RunSmart(ctx) // smart processing queues

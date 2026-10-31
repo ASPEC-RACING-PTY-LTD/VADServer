@@ -388,15 +388,10 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, errf(400, "is_folder", "Folders cannot be downloaded directly; use the zip download"))
 		return
 	}
-	loc, err := s.st.BlobLocation(r.Context(), u.ID, n.SHA256)
+	f, err := s.openBlob(r.Context(), u.ID, n.SHA256)
 	if err != nil {
-		writeErr(w, r, err)
-		return
-	}
-	f, err := s.blobs.Open(loc, u.ID, n.SHA256)
-	if err != nil {
-		slog.Error("blob missing", "node", n.ID, "sha", n.SHA256, "err", err)
-		writeErr(w, r, errf(503, "content_unavailable", "File content is unavailable on the storage device"))
+		slog.Error("blob unavailable", "node", n.ID, "sha", n.SHA256, "err", err)
+		writeErr(w, r, contentError(err))
 		return
 	}
 	defer f.Close()
@@ -427,6 +422,10 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 	}
 	// ServeContent handles Range, If-Range and conditional requests without
 	// reading the whole file into memory.
+	if err := precheck(r, f); err != nil {
+		writeErr(w, r, contentError(err))
+		return
+	}
 	http.ServeContent(w, r, n.Name, time.UnixMilli(n.ModifiedAt), f)
 }
 
@@ -523,7 +522,7 @@ func (s *Server) handleZip(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(e.node.Mime, "video/") && !strings.HasPrefix(e.node.Mime, "image/") && !strings.HasPrefix(e.node.Mime, "audio/") && e.node.Mime != "application/zip" {
 			hdr.Method = zip.Deflate
 		}
-		f, err := s.blobs.Open(locs[i], u.ID, e.node.SHA256)
+		f, err := s.openBlob(r.Context(), u.ID, e.node.SHA256)
 		if err != nil {
 			missing = append(missing, zipMissing{path: e.rel, reason: zipMissingReason(err)})
 			continue
