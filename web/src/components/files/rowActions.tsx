@@ -1,4 +1,4 @@
-import { Clapperboard, Download, Eye, FolderInput, Pencil, Tag, Trash2 } from 'lucide-react'
+import { Clapperboard, Download, Eye, FolderInput, Link2, Pencil, Tag, Trash2 } from 'lucide-react'
 import { previewable } from '../../lib/format'
 import type { MenuItem } from '../ui'
 import type { Node } from './types'
@@ -13,6 +13,8 @@ export type RowActionHandlers = {
   trash: (ids: number[]) => void
   /** Opens the video editor (video files only). */
   editVideo?: (n: Node) => void
+  /** Creates a public link (video files only). */
+  share?: (n: Node) => void
 }
 
 /** Context-menu items for `n`; acts on the whole selection when `n` is part of a multi-selection. */
@@ -29,6 +31,7 @@ export function rowActions(n: Node, selected: Set<number>, inSearch: boolean, h:
   return [
     { label: n.is_dir ? 'Open' : 'Preview', icon: <Eye className="size-4" />, onClick: () => h.open(n), disabled: !n.is_dir && !previewable(n.mime) },
     ...(h.editVideo && !n.is_dir && n.mime.startsWith('video/') ? [{ label: 'Edit video', icon: <Clapperboard className="size-4" />, onClick: () => h.editVideo!(n) }] : []),
+    ...(h.share && !n.is_dir && n.mime.startsWith('video/') ? [{ label: 'Share link…', icon: <Link2 className="size-4" />, onClick: () => h.share!(n) }] : []),
     { label: n.is_dir ? 'Download as zip' : 'Download', icon: <Download className="size-4" />, onClick: () => h.download([n.id]) },
     ...(inSearch && n.parent_id ? [{ label: 'Show in folder', icon: <FolderInput className="size-4" />, onClick: () => h.showInFolder(n) }] : []),
     'divider',

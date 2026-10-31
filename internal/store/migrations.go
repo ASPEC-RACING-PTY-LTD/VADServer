@@ -1243,4 +1243,23 @@ CREATE TABLE api_keys (
 	revoked_at   INTEGER
 );
 `,
+	// 17: public video links.
+	`
+CREATE TABLE shares (
+	id             INTEGER PRIMARY KEY,
+	user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	node_id        INTEGER NOT NULL,
+	sha256         TEXT NOT NULL,
+	token          TEXT NOT NULL UNIQUE,
+	title          TEXT NOT NULL,
+	description    TEXT NOT NULL DEFAULT '',
+	allow_download INTEGER NOT NULL DEFAULT 0,
+	created_at     INTEGER NOT NULL,
+	expires_at     INTEGER,
+	revoked_at     INTEGER,
+	views          INTEGER NOT NULL DEFAULT 0,
+	last_viewed_at INTEGER
+);
+CREATE INDEX shares_user ON shares(user_id, node_id);
+`,
 }

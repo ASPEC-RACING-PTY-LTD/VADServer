@@ -15,6 +15,7 @@ import { NewFolderModal } from '../components/files/NewFolderModal'
 import { PreviewModal } from '../components/files/PreviewModal'
 import { editorURL } from '../features/video/api'
 import { FilesSmartMenu } from '../features/smart/FilesSmartMenu'
+import { ShareDialog } from '../features/shares/ShareDialog'
 import { RenameModal } from '../components/files/RenameModal'
 import { rowActions } from '../components/files/rowActions'
 import { TagsModal } from '../components/files/TagsModal'
@@ -47,6 +48,7 @@ export function FilesPage() {
   const [renaming, setRenaming] = useState<Node | null>(null)
   const [moving, setMoving] = useState<number[] | null>(null)
   const [tagging, setTagging] = useState<Node | null>(null)
+  const [sharing, setSharing] = useState<Node | null>(null)
   const [newFolder, setNewFolder] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   // ?uploads=1 (the header's upload indicator) opens the uploads dialog.
@@ -113,6 +115,7 @@ export function FilesPage() {
       editTags: setTagging,
       trash: deleteIDs,
       editVideo: (x) => navigate(editorURL(x.id)),
+      share: setSharing,
     })
 
   const previewList = items.filter((i) => !i.is_dir && previewable(i.mime))
@@ -204,6 +207,7 @@ export function FilesPage() {
       <NewFolderModal open={newFolder} parentId={folder?.id ?? 0} onClose={() => setNewFolder(false)} onDone={refresh} />
       <RenameModal node={renaming} onClose={() => setRenaming(null)} onDone={refresh} />
       <TagsModal node={tagging} onClose={() => setTagging(null)} onDone={refresh} />
+      <ShareDialog node={sharing} onClose={() => setSharing(null)} />
       <MoveModal ids={moving} onClose={() => setMoving(null)} onMove={(target) => moving && moveTo(moving, target)} />
     </div>
   )

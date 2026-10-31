@@ -1,6 +1,6 @@
 import { lazy } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Activity, ArrowUpCircle, FolderOpen, HardDrive, LayoutDashboard, Monitor, RefreshCw, Shield, ShieldCheck, Sparkles, Trash2, Users, Workflow } from 'lucide-react'
+import { Activity, ArrowUpCircle, FolderOpen, HardDrive, LayoutDashboard, Library, Monitor, RefreshCw, Shield, ShieldCheck, Sparkles, Trash2, Users, Workflow } from 'lucide-react'
 import { DashboardPage } from '../pages/Dashboard'
 import { FilesPage } from '../pages/Files'
 import type { FeatureModule } from './types'
@@ -52,6 +52,7 @@ export const coreModules: FeatureModule[] = [
   // linked straight from the sidebar (their tabs are hidden in the console, see tabs/registry.ts).
   { id: 'admin', adminOnly: true, routes: [{ path: '/admin/*', component: AdminPage }], nav: { label: 'Administration', icon: Shield, to: '/admin', order: 10, section: 'admin', end: true } },
   { id: 'admin-users', adminOnly: true, routes: [], nav: { label: 'Users', icon: Users, to: '/admin/users', order: 20, section: 'admin' } },
+  { id: 'admin-library', adminOnly: true, routes: [], nav: { label: 'Full Library', icon: Library, to: '/admin/library', order: 25, section: 'admin' } },
   { id: 'admin-devices', adminOnly: true, routes: [], nav: { label: 'Devices', icon: Monitor, to: '/admin/devices', order: 30, section: 'admin' } },
   { id: 'admin-storage', adminOnly: true, routes: [], nav: { label: 'Storage', icon: HardDrive, to: '/admin/storage', order: 40, section: 'admin' } },
   { id: 'admin-smart', adminOnly: true, routes: [], nav: { label: 'Smart processing', icon: Sparkles, to: '/admin/smart', order: 45, section: 'admin' } },

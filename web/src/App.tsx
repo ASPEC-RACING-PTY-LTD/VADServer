@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { Layout } from './components/Layout'
@@ -6,6 +6,8 @@ import { PageLoader } from './components/ui'
 import { LoginPage, SetupPage } from './pages/Auth'
 import { enabledModules } from './app/registry'
 import { useFeatureContext } from './app/useFeatureContext'
+
+const PublicSharePage = lazy(() => import('./features/shares/PublicSharePage'))
 
 // Routes come from the feature registry (src/app/registry.ts); add pages there, not here.
 function AppRoutes() {
@@ -27,6 +29,15 @@ function useFullscreenRoute() {
 
 export function App() {
   const { state } = useAuth()
+  // Shared video links are public: shown with or without an account.
+  const share = matchPath('/s/:token', useLocation().pathname)
+  if (share?.params.token) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PublicSharePage token={share.params.token} />
+      </Suspense>
+    )
+  }
   if (state.status === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center">

@@ -796,6 +796,8 @@ func (s *Server) mountFeatures(rt routes) {
 	s.mountVideoEditor(rt)
 	s.mountSmart(rt)
 	s.mountAPIKeys(rt)
+	s.mountLibrary(rt)
+	s.mountShares(rt)
 }
 
 // Handler builds the HTTP router.
@@ -817,8 +819,9 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 		r.Post("/auth/register", s.handleRegister)
 		r.Post("/device/enroll", s.handleEnroll)
 		r.Get("/device/enroll/{id}", s.handleEnrollStatus)
-		s.mountDiag(r)       // admin session or diagnostics API key; read-only
-		s.mountNodePublic(r) // storage nodes authenticate with their own scheme
+		s.mountDiag(r)         // admin session or diagnostics API key; read-only
+		s.mountPublicShares(r) // public video links (no account)
+		s.mountNodePublic(r)   // storage nodes authenticate with their own scheme
 		s.mountNodeJobs(r)
 
 		r.Group(func(r chi.Router) {
@@ -952,6 +955,7 @@ func (s *Server) Handler(web http.Handler) http.Handler {
 		})
 	})
 	if web != nil {
+		r.Get("/s/{token}", s.shareMeta(web)) // public video page with link previews
 		r.Handle("/*", web)
 	}
 	return r
